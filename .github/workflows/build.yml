@@ -5,6 +5,9 @@ on:
     tags: ['v*']
   pull_request:
 
+permissions:
+  contents: write # the release step
+
 jobs:
   windows:
     runs-on: windows-latest
