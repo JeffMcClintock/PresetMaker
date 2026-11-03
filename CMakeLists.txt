@@ -102,7 +102,8 @@ if(PM_GUI)
             FetchContent_Declare(${dep} GIT_REPOSITORY https://github.com/JeffMcClintock/${dep} GIT_TAG origin/main
                 GIT_SHALLOW ON SOURCE_SUBDIR do-not-configure)
             FetchContent_MakeAvailable(${dep})
-            set(${DEP}_DIR ${${dep}_SOURCE_DIR})
+            string(TOLOWER ${dep} lower) # FetchContent names its variables in lower case
+            set(${DEP}_DIR ${${lower}_SOURCE_DIR})
         endif()
         message(STATUS "PresetMaker: ${dep} = ${${DEP}_DIR}")
     endforeach()
