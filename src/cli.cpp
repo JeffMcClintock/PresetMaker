@@ -210,6 +210,7 @@ int main(int argc, char** argv)
 		if (!ref) { print(err); return 2; }
 		NoteSpec n;
 		n.key = atoi(pos[1].c_str()); n.velocity = atoi(pos[2].c_str());
+		n.holdSec = a.o.holdSec; n.tailSec = a.o.tailSec;
 		Audio out;
 		if (!ref->render(n, kSr, out)) { puts("no region for that note"); return 2; }
 		writeWav(pos[3], out);
@@ -269,6 +270,7 @@ int main(int argc, char** argv)
 	{
 		NoteSpec n;
 		n.key = atoi(pos[1].c_str()); n.velocity = atoi(pos[2].c_str());
+		n.holdSec = a.o.holdSec; n.tailSec = a.o.tailSec;
 		for (size_t i = 4; i < pos.size(); ++i) // optional "Parameter Title=0..1" overrides
 		{
 			const auto eq = pos[i].rfind('=');

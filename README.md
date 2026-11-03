@@ -54,6 +54,21 @@ oscillator: the `gm_strings.txt` batch list, each result as `preset.txt`, and th
 files. `tools/populate_presets.py` wrote them into the SynthEdit project's preset slots;
 `tools/spectro.py` draws comparison spectrograms like the one above.
 
+### Hear it
+
+Five of the presets playing the same short tune as the gm.dls instrument they were fitted to,
+rendered by `tools/demo_tunes.py` (16-bit 48 kHz mono, 6.5 s, both files normalised to the same
+peak). GitHub does not play WAV inline: download to listen. The score is the held-out similarity
+from `--check` (notes the fit never saw).
+
+| instrument | gm.dls target | FretPlucked fitted | held-out |
+|---|---|---|---|
+| Acoustic Grand Piano | [target](examples/FretPlucked/audio/acoustic_grand_piano_target.wav) | [fitted](examples/FretPlucked/audio/acoustic_grand_piano_fitted.wav) | 34.1% |
+| Harpsichord | [target](examples/FretPlucked/audio/harpsichord_target.wav) | [fitted](examples/FretPlucked/audio/harpsichord_fitted.wav) | 34.1% |
+| Nylon Guitar | [target](examples/FretPlucked/audio/nylon_guitar_target.wav) | [fitted](examples/FretPlucked/audio/nylon_guitar_fitted.wav) | 34.3% |
+| Acoustic Bass | [target](examples/FretPlucked/audio/acoustic_bass_target.wav) | [fitted](examples/FretPlucked/audio/acoustic_bass_fitted.wav) | 29.3% |
+| Harp | [target](examples/FretPlucked/audio/harp_target.wav) | [fitted](examples/FretPlucked/audio/harp_fitted.wav) | 30.6% |
+
 ## Tips
 
 - **Hold the volume.** A free gain parameter lets the search trade loudness for everything else.
