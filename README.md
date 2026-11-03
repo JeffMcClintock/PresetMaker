@@ -58,8 +58,9 @@ files. `tools/populate_presets.py` wrote them into the SynthEdit project's prese
 
 Five of the presets playing the same short tune as the gm.dls instrument they were fitted to,
 rendered by `tools/demo_tunes.py` (16-bit 48 kHz mono, 6.5 s, both files normalised to the same
-peak). GitHub does not play WAV inline: download to listen. The score is the held-out similarity
-from `--check` (notes the fit never saw).
+peak). **[Play them in the browser](https://jeffmcclintock.github.io/PresetMaker/examples/FretPlucked/audio/)**,
+or download the files below (GitHub does not play WAV inline). The score is the held-out
+similarity from `--check` (notes the fit never saw).
 
 | instrument | gm.dls target | FretPlucked fitted | held-out |
 |---|---|---|---|

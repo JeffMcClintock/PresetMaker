@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FretPlucked demos</title>
+<style>
+  :root { --bg: #fff; --fg: #1f2328; --muted: #656d76; --line: #d0d7de; --accent: #0969da; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --line: #30363d; --accent: #58a6ff; }
+  }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--fg);
+         font: 15px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 20px; }
+  a { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-weight: 600; color: var(--muted); font-size: 13px; }
+  td:first-child { white-space: nowrap; font-weight: 600; }
+  audio { width: 100%; min-width: 180px; height: 36px; }
+  td.score { text-align: right; color: var(--muted); white-space: nowrap; }
+  @media (max-width: 600px) { th:nth-child(4), td.score { display: none; } td:first-child { white-space: normal; } }
+</style>
+</head>
+<body>
+<main>
+<h1>FretPlucked presets fitted by PresetMaker</h1>
+<p>The same short tune played by the gm.dls instrument (target) and by the FretPlucked
+preset the fit found (fitted). The score is similarity on notes the fit never saw.
+<a href="https://github.com/JeffMcClintock/PresetMaker">PresetMaker on GitHub</a>.</p>
+<table>
+<tr><th>instrument</th><th>gm.dls target</th><th>FretPlucked fitted</th><th>held-out</th></tr>
+<tr><td>Acoustic Grand Piano</td><td><audio controls preload="none" src="acoustic_grand_piano_target.wav"></audio></td><td><audio controls preload="none" src="acoustic_grand_piano_fitted.wav"></audio></td><td class="score">34.1%</td></tr>
+<tr><td>Harpsichord</td><td><audio controls preload="none" src="harpsichord_target.wav"></audio></td><td><audio controls preload="none" src="harpsichord_fitted.wav"></audio></td><td class="score">34.1%</td></tr>
+<tr><td>Nylon Guitar</td><td><audio controls preload="none" src="nylon_guitar_target.wav"></audio></td><td><audio controls preload="none" src="nylon_guitar_fitted.wav"></audio></td><td class="score">34.3%</td></tr>
+<tr><td>Acoustic Bass</td><td><audio controls preload="none" src="acoustic_bass_target.wav"></audio></td><td><audio controls preload="none" src="acoustic_bass_fitted.wav"></audio></td><td class="score">29.3%</td></tr>
+<tr><td>Harp</td><td><audio controls preload="none" src="harp_target.wav"></audio></td><td><audio controls preload="none" src="harp_fitted.wav"></audio></td><td class="score">30.6%</td></tr>
+</table>
+<script>
+  // Only one clip plays at a time.
+  document.querySelectorAll('audio').forEach(a => a.addEventListener('play', () =>
+    document.querySelectorAll('audio').forEach(b => { if (b !== a) b.pause(); })));
+</script>
+</main>
+</body>
+</html>
