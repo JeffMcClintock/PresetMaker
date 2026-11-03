@@ -40,9 +40,12 @@ private:
 	struct Settings
 	{
 		std::string plugin, sampleFolder, name, outDir;
+		bool nameAuto = true; // the name follows the target until the user types one
 		int gmProgram = 0, evals = 600;
 		double preRoll = 0.15;
 	} s_;
+	std::vector<std::string> gmNames_; // by program number
+	void autoName();
 
 	gmpi_forms::State<std::string> pluginText_, folderText_, nameText_, outDirText_, evalsText_, preRollText_, gmList_;
 	gmpi_forms::State<int32_t> gmProgram_, page_;

@@ -32,17 +32,19 @@ std::string documentsFolder()
 	return out;
 }
 
-// "Acoustic Grand Piano=0,Bright Acoustic Piano=1,..." for the combo box
-std::string gmProgramList()
+// "0 Piano 1=0,1 Piano 2=1,..." for the combo box, and the names by program number
+std::string gmProgramList(std::vector<std::string>& names)
 {
 	DlsFile dls;
 	std::string r;
+	names.assign(128, "");
 	if (dls.load("C:\\Windows\\System32\\drivers\\gm.dls"))
 		for (auto& i : dls.instruments)
-			if (!i.drum && i.bank == 0)
+			if (!i.drum && i.bank == 0 && i.program < 128)
 			{
 				std::string n = i.name;
 				for (auto& c : n) if (c == ',' || c == '=') c = ' ';
+				names[i.program] = i.name;
 				r += (r.empty() ? "" : ",") + std::format("{} {}={}", i.program, n, i.program);
 			}
 	return r.empty() ? "no gm.dls=0" : r;
@@ -74,8 +76,17 @@ bool ignoredByDefault(std::string title)
 FitForm::FitForm()
 {
 	s_.outDir = documentsFolder() + "\\PresetMaker";
-	gmList_ = gmProgramList();
+	gmList_ = gmProgramList(gmNames_);
+	autoName();
 	refreshStates();
+}
+
+// the target's name: the GM instrument, or the sample folder's own name
+void FitForm::autoName()
+{
+	if (!s_.nameAuto) return;
+	if (!s_.sampleFolder.empty()) s_.name = std::filesystem::path(s_.sampleFolder).filename().string();
+	else if (s_.gmProgram >= 0 && s_.gmProgram < (int)gmNames_.size()) s_.name = gmNames_[s_.gmProgram];
 }
 
 FitForm::~FitForm()
@@ -270,20 +281,20 @@ void FitForm::fitPage(gmpi::drawing::Rect area)
 		ComboBox cb({});
 		cb.view->enum_list.setSource(&gmList_);
 		cb.view->enum_value.setSource(&gmProgram_);
-		cb.view->validateAndSave = [this](int32_t id) { s_.gmProgram = id; refreshStates(); };
+		cb.view->validateAndSave = [this](int32_t id) { s_.gmProgram = id; autoName(); refreshStates(); };
 	}
 	{
 		auto row = beginRow("Sample folder", { kLabelW, fr(1.0f), kRow });
-		TextEdit e(folderText_, [this](const std::string& v) { s_.sampleFolder = v; refreshStates(); });
+		TextEdit e(folderText_, [this](const std::string& v) { s_.sampleFolder = v; autoName(); refreshStates(); });
 		browse(folderText_, [this](const std::string& v) {
 			// a file picker: take the folder of whatever WAV was chosen
 			s_.sampleFolder = std::filesystem::path(v).parent_path().string();
-			refreshStates(); rebuild();
+			autoName(); refreshStates(); rebuild();
 		});
 	}
 	{
 		auto row = beginRow("Preset name");
-		TextEdit e(nameText_, [this](const std::string& v) { s_.name = v; refreshStates(); });
+		TextEdit e(nameText_, [this](const std::string& v) { s_.name = v; s_.nameAuto = v.empty(); autoName(); refreshStates(); });
 	}
 	{
 		auto row = beginRow("Renders, pre-roll", { kLabelW, 80.0f, 80.0f, fr(1.0f) });

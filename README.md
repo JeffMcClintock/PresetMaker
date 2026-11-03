@@ -8,6 +8,9 @@ a `.vstpreset` where your DAW will find it.
 It is best effort by design: an additive string synth will never be a distortion guitar, but it
 will find the nearest thing it *can* do, and tell you how close it got.
 
+PresetMaker is free. If it saved you an afternoon of knob-twiddling, you can
+[buy Jeff a coffee](https://ko-fi.com/TideRack).
+
 <img src="examples/FretPlucked/grand_piano_spectrogram.png" width="720"/>
 
 *gm.dls Acoustic Grand Piano (top) and the fitted preset for a VSTi plugin instrument ("FretPlucked", bottom) at C3, C4, C5.*
