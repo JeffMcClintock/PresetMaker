@@ -89,10 +89,18 @@ def main(src, dst, presets_json):
 
     text = re.sub(r'<param\b[^>]*>.*?</param>', patch_param, text, flags=re.S)
 
-    names = ''.join(f'\n                <Name idx="{p["slot"]}" text="{escape(p["name"])}"/>' for p, _ in loaded)
-    text, n = re.subn(r'<ProgramNames\s*/>|<ProgramNames>.*?</ProgramNames>',
-                      f'<ProgramNames>{names}\n            </ProgramNames>', text, count=1, flags=re.S)
-    assert n == 1, 'no <ProgramNames> element'
+    # The names live in the exported container's <ProgramNames>, which is the one with entries when
+    # the project already has presets (an outer container carries an empty one). Merge: listed slots
+    # take the new name, every other slot keeps its own.
+    blocks = list(re.finditer(r'<ProgramNames\s*/>|<ProgramNames>.*?</ProgramNames>', text, flags=re.S))
+    assert blocks, 'no <ProgramNames> element'
+    target = next((b for b in blocks if '<Name ' in b.group(0)), blocks[0])
+    names = dict(re.findall(r'<Name idx="(\d+)" text="([^"]*)"', target.group(0)))
+    for p, _ in loaded:
+        names[str(p['slot'])] = escape(p['name'])
+    indent = text[text.rfind('\n', 0, target.start()) + 1:target.start()]
+    body = ''.join(f'\n{indent}    <Name idx="{k}" text="{v}"/>' for k, v in sorted(names.items(), key=lambda kv: int(kv[0])))
+    text = text[:target.start()] + f'<ProgramNames>{body}\n{indent}</ProgramNames>' + text[target.end():]
 
     open(dst, 'wb').write(text.replace('\n', nl).encode('utf-8'))
     print(f'{len(loaded)} presets written, {changed} parameter lists rewritten -> {dst}')
