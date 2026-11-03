@@ -221,8 +221,8 @@ int main(int argc, char** argv)
 		Audio r, c;
 		if (!readWav(pos[0], r) || !readWav(pos[1], c)) { puts("wav read failed"); return 2; }
 		const Score s = Scorer(r, a.w).compare(c);
-		printf("similarity %.1f%%  total %.4f  (fine %.4f tonal %.4f envelope %.4f delta %.4f | attack-only %.4f)  gain %+.1f dB\n",
-		       s.similarity(), s.total, s.fine, s.tonal, s.envelope, s.delta, s.attack, s.gainDb);
+		printf("similarity %.1f%%  total %.4f  (fine %.4f tonal %.4f envelope %.4f delta %.4f level %.4f | attack-only %.4f)  gain %+.1f dB\n",
+		       s.similarity(), s.total, s.fine, s.tonal, s.envelope, s.delta, s.level, s.attack, s.gainDb);
 		return 0;
 	}
 	if (pos.empty()) return usage();

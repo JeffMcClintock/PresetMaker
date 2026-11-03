@@ -26,6 +26,7 @@ struct ScoreWeights
 	double wEnvelope = 0.20;      // whole-spectrum loudness vs time
 	double wDelta = 0.30;         // change of each band's loudness over deltaLagSec: how partials decay, not just where they sit
 	double deltaLagSec = 0.05;
+	double wLevel = 0.25;         // |gain offset| per 40 dB: a small cost for any level mismatch, a slope off the near-silent plateau
 	double peakSpl = 75.0;        // reference's loudest frame is placed here (dB SPL)
 	double maskSpread = 0.0;      // width of the masking spread, 1 = Schroeder, 0 = off (calibration: no gain, see README)
 };
@@ -36,6 +37,7 @@ struct Score
 	double fine = 0, tonal = 0, envelope = 0, delta = 0;
 	double attack = 0;     // diagnostic: fine-resolution distance over the first 100 ms only
 	double gainDb = 0;     // level offset applied to the candidate to match
+	double level = 0;      // |gainDb| / 40: the level mismatch as a distance
 	double similarity() const; // 0..100
 };
 

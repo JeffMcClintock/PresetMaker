@@ -288,6 +288,7 @@ Score Scorer::compare(const Audio& candIn) const
 	sc.delta = 0.5 * (deltaDist[0] + deltaDist[1]);
 	sc.attack = attackDist;
 	sc.gainDb = gainDb;
-	sc.total = w_.wFine * sc.fine + w_.wTonal * sc.tonal + w_.wEnvelope * sc.envelope + w_.wDelta * sc.delta;
+	sc.level = std::fabs(gainDb) / 40.0;
+	sc.total = w_.wFine * sc.fine + w_.wTonal * sc.tonal + w_.wEnvelope * sc.envelope + w_.wDelta * sc.delta + w_.wLevel * sc.level;
 	return sc;
 }
