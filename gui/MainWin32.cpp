@@ -2,6 +2,7 @@
 // FitForm as the frame's client. After gmpi_ui/examples/FormsDemo/MainWin32.cpp.
 #define NOMINMAX
 #include <windows.h>
+#include <string>
 
 #include "backends/DrawingFrameWin.h"
 #include "FitForm.h"
@@ -28,6 +29,17 @@ class App
 {
 public:
 	~App() { close(); }
+
+	// a .vst3 path on the command line (or dropped onto the exe) pre-fills the plugin
+	void setPlugin(const wchar_t* cmdLine)
+	{
+		std::wstring w = cmdLine;
+		if (w.size() >= 2 && w.front() == L'"' && w.back() == L'"') w = w.substr(1, w.size() - 2);
+		if (w.empty()) return;
+		std::string utf8(::WideCharToMultiByte(CP_UTF8, 0, w.c_str(), -1, nullptr, 0, nullptr, nullptr) - 1, '\0');
+		::WideCharToMultiByte(CP_UTF8, 0, w.c_str(), -1, utf8.data(), (int)utf8.size() + 1, nullptr, nullptr);
+		form_->setPlugin(utf8);
+	}
 
 	bool create()
 	{
@@ -145,9 +157,10 @@ private:
 };
 } // namespace
 
-int APIENTRY wWinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPWSTR, _In_ int)
+int APIENTRY wWinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPWSTR cmdLine, _In_ int)
 {
 	App app;
+	app.setPlugin(cmdLine);
 	if (!app.create())
 	{
 		::MessageBoxW(nullptr, L"Could not create the window.", L"PresetMaker", MB_OK | MB_ICONERROR);

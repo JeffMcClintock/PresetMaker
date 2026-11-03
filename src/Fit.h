@@ -22,6 +22,7 @@ struct FitOptions
 	double sigma = 0;            // initial CMA step; 0 = 0.25 cold / 0.05 warm
 	double preRollSec = 0.15;
 	std::map<std::string, double> fixed; // parameter title -> held value (left out of the fit)
+	std::map<uint32_t, double> fixedById; // the same by parameter id (the GUI's Ignore ticks; titles can repeat)
 	// title substrings left out of the fit (at the plugin's value); MIDI controller parameters by default
 	std::vector<std::string> skip{"MIDI CC", "Pitch Bend", "Aftertouch", "Channel Pressure", "Program Change"};
 	int seed = 7;

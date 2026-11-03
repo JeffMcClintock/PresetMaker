@@ -1,6 +1,7 @@
 #include "FitForm.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -20,7 +21,7 @@ using eAutoFlow = gmpi::ui::builder::ViewParent::eAutoFlow;
 
 namespace
 {
-constexpr float kRow = 24.0f, kGap = 6.0f, kMargin = 12.0f, kLabelW = 150.0f, kButtonW = 90.0f;
+constexpr float kRow = 24.0f, kGap = 6.0f, kMargin = 12.0f, kLabelW = 150.0f, kButtonW = 90.0f, kTabsH = 32.0f;
 
 std::string documentsFolder()
 {
@@ -60,18 +61,13 @@ std::string bundleRoot(std::string path)
 	return path;
 }
 
-void parseFix(const std::string& s, std::map<std::string, double>& fixed)
+// Ticked by default: level and tuning controls, which a search should not be allowed to move.
+bool ignoredByDefault(std::string title)
 {
-	size_t p = 0;
-	while (p <= s.size())
-	{
-		const size_t e = s.find(';', p);
-		const std::string item = s.substr(p, e == std::string::npos ? std::string::npos : e - p);
-		const auto eq = item.rfind('=');
-		if (eq != std::string::npos) fixed[item.substr(0, eq)] = atof(item.c_str() + eq + 1);
-		if (e == std::string::npos) break;
-		p = e + 1;
-	}
+	for (auto& c : title) c = (char)tolower((unsigned char)c);
+	for (const char* w : { "volume", "gain", "output", "master", "level", "fine", "tune" })
+		if (title.find(w) != std::string::npos) return true;
+	return false;
 }
 } // namespace
 
@@ -99,11 +95,35 @@ void FitForm::refreshStates()
 	pluginText_ = s_.plugin;
 	folderText_ = s_.sampleFolder;
 	nameText_ = s_.name;
-	fixedText_ = s_.fixed;
 	outDirText_ = s_.outDir;
 	evalsText_ = std::to_string(s_.evals);
 	preRollText_ = std::format("{}", s_.preRoll);
 	gmProgram_ = s_.gmProgram;
+}
+
+// Only from Body(): the previous visuals are already released, so the old tick States may go.
+void FitForm::loadParams()
+{
+	paramsOf_ = s_.plugin;
+	params_.clear();
+	ignore_.clear();
+	paramsNote_.clear();
+	if (s_.plugin.empty()) { paramsNote_ = "Choose a plugin on the Fit tab."; return; }
+
+	Vst3Plugin vst;
+	std::string err;
+	if (!vst.load(s_.plugin, err)) { paramsNote_ = "Cannot load the plugin: " + err; return; }
+	FitOptions defaults;
+	for (size_t i = 0; i < vst.params().size(); ++i)
+	{
+		auto& p = vst.params()[i];
+		bool midi = false;
+		for (auto& s : defaults.skip) midi |= p.title.find(s) != std::string::npos;
+		if (!p.tweakable || midi) continue;
+		params_.push_back({ p.id, p.title, vst.values[i] });
+		ignore_.push_back(std::make_unique<gmpi_forms::State<bool>>(ignoredByDefault(p.title)));
+	}
+	if (params_.empty()) paramsNote_ = "The plugin exposes no parameters the search could move.";
 }
 
 gmpi::ReturnCode FitForm::arrange(const gmpi::drawing::Rect* finalRect)
@@ -161,7 +181,8 @@ void FitForm::startFit()
 	o.name = s_.name;
 	o.budget = s_.evals;
 	o.preRollSec = s_.preRoll;
-	parseFix(s_.fixed, o.fixed);
+	for (size_t i = 0; i < params_.size(); ++i)
+		if (ignore_[i]->get()) o.fixedById[params_[i].id] = params_[i].value;
 	std::string safe = s_.name.empty() ? "fit" : s_.name;
 	for (auto& c : safe) if (strchr("\\/:*?\"<>|", c)) c = '_';
 	o.outDir = s_.outDir + "\\" + safe;
@@ -198,9 +219,24 @@ void FitForm::startFit()
 
 void FitForm::Body()
 {
+	if (paramsOf_ != s_.plugin) loadParams();
+
 	gmpi::drawing::Rect area = bounds_;
 	area.left += kMargin; area.right -= kMargin; area.top += kMargin; area.bottom -= kMargin;
 
+	{
+		TabBar tabs({ "Fit", "Parameters" }, { area.left, area.top, area.right, area.top + kTabsH });
+		tabs.view->selected.setSource(&page_);
+		tabs.view->validateAndSave = [this](int32_t i) { page_ = i; rebuild(); };
+	}
+	area.top += kTabsH + kGap;
+
+	if (page_.get() == 1) parametersPage(area);
+	else fitPage(area);
+}
+
+void FitForm::fitPage(gmpi::drawing::Rect area)
+{
 	Grid outer({ .gap = kGap, .auto_flow = eAutoFlow::rows, .default_track_size = auto_size() }, area);
 
 	Status st;
@@ -226,7 +262,7 @@ void FitForm::Body()
 
 	{
 		auto row = beginRow("Plugin (.vst3)", { kLabelW, fr(1.0f), kRow });
-		TextEdit e(pluginText_, [this](const std::string& v) { s_.plugin = bundleRoot(v); refreshStates(); });
+		TextEdit e(pluginText_, [this](const std::string& v) { s_.plugin = bundleRoot(v); refreshStates(); rebuild(); });
 		browse(pluginText_, [this](const std::string& v) { s_.plugin = bundleRoot(v); refreshStates(); rebuild(); });
 	}
 	{
@@ -248,10 +284,6 @@ void FitForm::Body()
 	{
 		auto row = beginRow("Preset name");
 		TextEdit e(nameText_, [this](const std::string& v) { s_.name = v; refreshStates(); });
-	}
-	{
-		auto row = beginRow("Hold", { kLabelW, fr(1.0f) });
-		TextEdit e(fixedText_, [this](const std::string& v) { s_.fixed = v; refreshStates(); });
 	}
 	{
 		auto row = beginRow("Renders, pre-roll", { kLabelW, 80.0f, 80.0f, fr(1.0f) });
@@ -281,8 +313,10 @@ void FitForm::Body()
 		};
 		Label filler("");
 	}
-	Label hint1("Hold: parameters kept fixed, e.g. Volume=0.3;Pan=0.5", { 0, 0, 0, 14 });
-	Label hint2("Sample folder: WAVs named <key>_<vel>.wav, used instead of the GM target", { 0, 0, 0, 14 });
+	size_t held = 0;
+	for (auto& t : ignore_) held += t->get();
+	Label hint1(params_.empty() ? std::string("Sample folder: WAVs named <key>_<vel>.wav, used instead of the GM target")
+	                            : std::format("{} of {} parameters searched; the Parameters tab chooses which", params_.size() - held, params_.size()), { 0, 0, 0, 14 });
 	Spacer sp({ 0, 0, 0, kGap });
 	Label status(st.line, { 0, 0, 0, 20 });
 	progress_ = st.fraction;
@@ -290,4 +324,27 @@ void FitForm::Body()
 	bar.view->fraction.setSource(&progress_);
 	if (!st.detail.empty()) Label detail(st.detail, { 0, 0, 0, 16 });
 	for (auto& l : st.results) Label line(l, { 0, 0, 0, 16 });
+}
+
+void FitForm::parametersPage(gmpi::drawing::Rect area)
+{
+	{
+		Label head(paramsNote_.empty() ? "Ticked parameters are ignored: left at their current value and not searched." : paramsNote_,
+		           { area.left, area.top, area.right, area.top + 16 });
+	}
+	area.top += 16 + kGap;
+	if (params_.empty()) return;
+
+	// inside the portal, coordinates are the portal's own; leave room for its scrollbar
+	ScrollPortal portal(area);
+	Grid list({ .gap = 2.0f, .auto_rows = kRow, .auto_flow = eAutoFlow::rows, .default_track_size = kRow },
+	          { 0, 0, area.right - area.left - 20.0f, 0 });
+	for (size_t i = 0; i < params_.size(); ++i)
+	{
+		Grid row({ .gap = kGap, .auto_rows = kRow, .auto_flow = eAutoFlow::columns, .column_widths = { kRow, fr(1.0f), 70.0f } }, {});
+		ToggleSwitch tick("", *ignore_[i]);
+		tick.view->validateAndSave = [this, i](bool on) { *ignore_[i] = on; };
+		Label title(params_[i].title);
+		Label value(std::format("{:.2f}", params_[i].value));
+	}
 }

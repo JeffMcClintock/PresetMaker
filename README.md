@@ -31,8 +31,9 @@ playing in the browser. The presets themselves are in [`examples/FretPlucked/`](
 Also in the output folder: `fit_*.wav` and `ref_*.wav`, the fitted plugin and the target playing
 the same notes, so you can hear how close it got.
 
-**Hold** keeps parameters out of the search, e.g. `Volume=0.3` so the fit cannot trade loudness for
-tone. Leave the rest at their defaults the first time.
+The **Parameters** tab lists the plugin's parameters with an *ignore* tick each: a ticked one is
+left at its current value and not searched. Level and tuning controls are ticked for you, so the
+fit cannot trade loudness for tone or drift out of tune. Leave the rest the first time.
 
 ## Command line
 
@@ -76,7 +77,8 @@ similarity from `--check` (notes the fit never saw).
 
 ## Tips
 
-- **Hold the volume.** A free gain parameter lets the search trade loudness for everything else.
+- **Hold the volume.** A free gain parameter lets the search trade loudness for everything else
+  (the GUI ticks it for you; on the command line use `--fix "Volume=0.3"`).
 - **Listen, and check the pitch.** The score compares loudness in auditory bands, which hears
   timbre and envelope well but is nearly deaf to harmonicity: a plugin whose partials are stretched
   can score well and sound wrong. If the fit keeps pushing a tuning or spacing parameter away from
