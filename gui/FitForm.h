@@ -41,6 +41,7 @@ private:
 
 	gmpi_forms::State<std::string> pluginText_, folderText_, nameText_, fixedText_, outDirText_, evalsText_, preRollText_, gmList_;
 	gmpi_forms::State<int32_t> gmProgram_;
+	gmpi_forms::State<float> progress_;
 	void refreshStates();
 
 	// worker
@@ -48,6 +49,7 @@ private:
 	{
 		bool running = false, finished = false;
 		std::string line, detail;         // progress / outcome, and where the preset went
+		float fraction = 0;               // of the whole run: renders, then the held-out check
 		std::vector<std::string> results; // the lines that matter once done
 		unsigned version = 0;
 	};

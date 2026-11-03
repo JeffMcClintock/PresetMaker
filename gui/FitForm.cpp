@@ -1,5 +1,6 @@
 #include "FitForm.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -174,20 +175,23 @@ void FitForm::startFit()
 				post([&](Status& s) { s.results.push_back(l.substr(0, l.find(" (fine"))); });
 		};
 		const FitResult r = runFit(o, ScoreWeights{}, [&](const FitProgress& p) {
-			post([&](Status& s) { s.line = std::format("RUNNING: {} of {} renders, best {:.4f}, step {:.3f}, {:.0f} s", p.evals, p.budget, p.best, p.sigma, p.seconds); });
+			post([&](Status& s) {
+				s.line = std::format("RUNNING: {} of {} renders, best {:.4f}, step {:.3f}, {:.0f} s", p.evals, p.budget, p.best, p.sigma, p.seconds);
+				s.fraction = 0.9f * float(p.evals) / float(std::max(1, p.budget)); // the last tenth is the held-out check
+			});
 			return !cancel_.load();
 		}, log);
 		std::string line, detail;
 		if (r.ok)
 		{
-			post([&](Status& s) { s.line = "RUNNING: checking held-out notes..."; });
+			post([&](Status& s) { s.line = "RUNNING: checking held-out notes..."; s.fraction = 0.9f; });
 			const double mean = checkPreset(o, ScoreWeights{}, r.presetTxt, log);
 			line = std::format("FINISHED. Held-out similarity {:.1f}%", mean);
 			detail = r.vstPreset.empty() ? "Saved " + r.presetTxt + "  (no .vstpreset: give it a preset name)" : "Saved " + r.vstPreset;
 		}
 		else if (!r.presetTxt.empty()) { line = "CANCELLED"; detail = "Best so far saved to " + r.presetTxt; }
 		else line = "FAILED: " + r.error;
-		post([&](Status& s) { s.line = line; s.detail = detail; s.running = false; s.finished = true; });
+		post([&](Status& s) { s.line = line; s.detail = detail; if (r.ok) s.fraction = 1; s.running = false; s.finished = true; });
 		CoUninitialize();
 	});
 }
@@ -263,6 +267,7 @@ void FitForm::Body()
 	{
 		Grid row({ .gap = kGap, .auto_rows = kRow, .auto_flow = eAutoFlow::columns, .column_widths = { kButtonW, kButtonW, kButtonW, fr(1.0f) } }, {});
 		Button fit(running ? "Fitting..." : "Fit");
+		fit.view->accent = !running;
 		fit.view->onClick = [this] { if (!s_.plugin.empty()) startFit(); };
 		Button cancel("Cancel");
 		cancel.view->onClick = [this] { cancel_ = true; };
@@ -280,6 +285,9 @@ void FitForm::Body()
 	Label hint2("Sample folder: WAVs named <key>_<vel>.wav, used instead of the GM target", { 0, 0, 0, 14 });
 	Spacer sp({ 0, 0, 0, kGap });
 	Label status(st.line, { 0, 0, 0, 20 });
+	progress_ = st.fraction;
+	ProgressBar bar({ 0, 0, 0, 6 });
+	bar.view->fraction.setSource(&progress_);
 	if (!st.detail.empty()) Label detail(st.detail, { 0, 0, 0, 16 });
 	for (auto& l : st.results) Label line(l, { 0, 0, 0, 16 });
 }
