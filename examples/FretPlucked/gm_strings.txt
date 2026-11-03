@@ -1,0 +1,21 @@
+# reference<TAB>preset name   (pmcli fit-batch FretPlucked.vst3 gm_strings.txt out --preroll 0.25 --fix "Volume=0.3;Harmonic Spacing=0.272727")
+0	Acoustic Grand Piano
+1	Bright Acoustic Piano
+2	Electric Grand Piano
+3	Honky-tonk Piano
+6	Harpsichord
+7	Clavinet
+24	Nylon Guitar
+25	Steel Guitar
+26	Jazz Guitar
+27	Clean Guitar
+29	Overdriven Guitar
+30	Distortion Guitar
+32	Acoustic Bass
+36	Slap Bass 1
+37	Slap Bass 2
+45	Pizzicato Strings
+46	Harp
+104	Sitar
+105	Banjo
+106	Shamisen

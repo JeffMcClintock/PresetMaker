@@ -1,0 +1,26 @@
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DPM_GUI=ON
+      - run: cmake --build build --config Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PresetMaker-windows
+          path: |
+            build/Release/pmcli.exe
+            build/Release/PresetMaker.exe
+      - if: startsWith(github.ref, 'refs/tags/v')
+        run: Compress-Archive -Path build/Release/pmcli.exe, build/Release/PresetMaker.exe -DestinationPath PresetMaker-windows.zip
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PresetMaker-windows.zip
