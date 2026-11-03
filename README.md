@@ -12,6 +12,9 @@ will find the nearest thing it *can* do, and tell you how close it got.
 
 *gm.dls Acoustic Grand Piano (top) and the fitted preset for a VSTi plugin instrument ("FretPlucked", bottom) at C3, C4, C5.*
 
+**Hear the results:** [five fitted presets next to the instruments they were fitted to](https://jeffmcclintock.github.io/PresetMaker/examples/FretPlucked/audio/),
+playing in the browser. The presets themselves are in [`examples/FretPlucked/`](examples/FretPlucked/).
+
 ## Get started
 
 1. Download `PresetMaker-windows.zip` from [Releases](https://github.com/JeffMcClintock/PresetMaker/releases)
