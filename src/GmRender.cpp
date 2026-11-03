@@ -37,6 +37,7 @@ bool renderGmNote(const DlsFile& dls, const NoteSpec& n, int sr, Audio& out)
 
 	out.sampleRate = sr;
 	out.s.assign(total, 0.f);
+	out.onset = 0;
 
 	auto modTime = [&](double base, const DlsRegion::TimeMod& m) {
 		return base <= 0 ? 0.0 : base * std::exp2((m.key * n.key / 127.0 + m.vel * n.velocity / 127.0) / 1200.0);

@@ -59,5 +59,6 @@ private:
 	size_t len_ = 0;
 	Audio ref_;
 	double offDb_ = 0; // reference calibration
+	double refSumSq_ = 0; // of the trimmed reference: seeds the gain fit-out
 	std::vector<Feat> refFeat_;
 };

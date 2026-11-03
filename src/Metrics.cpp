@@ -137,16 +137,25 @@ inline double loudness(double powerLin, double offDb, double thrDb)
 	return excess <= 0 ? 0.0 : std::pow(10.0, 0.023 * excess) - 1.0;
 }
 
-std::vector<float> trimOnset(const std::vector<float>& x, int sr)
+// Start the signal 2 ms before note-on. A producer that knows note-on says so (a.onset); only an
+// unlabelled WAV falls back to detecting it, which is a threshold and so a discontinuity: a slow
+// attack would otherwise be trimmed to where it becomes audible, hiding the attack itself.
+std::vector<float> trimOnset(const Audio& a)
 {
-	float pk = 0;
-	for (float v : x) pk = std::max(pk, std::fabs(v));
-	if (pk <= 0) return x;
+	const auto& x = a.s;
+	const size_t pre = size_t(0.002 * a.sampleRate);
 	size_t i = 0;
-	while (i < x.size() && std::fabs(x[i]) < pk * 1e-3f) ++i;
-	const size_t pre = size_t(0.002 * sr);
+	if (a.onset >= 0)
+		i = size_t(a.onset);
+	else
+	{
+		float pk = 0;
+		for (float v : x) pk = std::max(pk, std::fabs(v));
+		if (pk <= 0) return x;
+		while (i < x.size() && std::fabs(x[i]) < pk * 1e-3f) ++i;
+	}
 	i = i > pre ? i - pre : 0;
-	return std::vector<float>(x.begin() + i, x.end());
+	return std::vector<float>(x.begin() + std::min(i, x.size()), x.end());
 }
 } // namespace
 
@@ -155,8 +164,9 @@ double Score::similarity() const { return 100.0 * std::exp(-3.0 * total); }
 Scorer::Scorer(const Audio& ref, ScoreWeights w) : w_(w), sr_(ref.sampleRate)
 {
 	ref_.sampleRate = sr_;
-	ref_.s = trimOnset(ref.s, sr_);
+	ref_.s = trimOnset(ref);
 	len_ = ref_.s.size();
+	for (float v : ref_.s) refSumSq_ += double(v) * v;
 	for (int r = 0; r < 2; ++r)
 		refFeat_.push_back(analyse(ref_.s, kResN[r], kResHop[r], sr_, len_, w_.maskSpread));
 
@@ -174,7 +184,7 @@ Scorer::Scorer(const Audio& ref, ScoreWeights w) : w_(w), sr_(ref.sampleRate)
 Score Scorer::compare(const Audio& candIn) const
 {
 	Score sc;
-	std::vector<float> cx = trimOnset(candIn.s, sr_);
+	std::vector<float> cx = trimOnset(candIn);
 	cx.resize(len_, 0.f); // a short render is padded with silence; a long one is cut
 
 	double sumSq = 0;
@@ -263,17 +273,27 @@ Score Scorer::compare(const Audio& candIn) const
 
 		if (r == 0)
 		{
-			// fit overall gain on the fine resolution: coarse grid, then refine
-			double best = 1e30, bg = 0;
-			for (double g = -36; g <= 36; g += 3)
+			// fit overall gain on the fine resolution: seeded by the RMS ratio (so there is no range
+			// to fall off), a coarse grid around it, then a continuous golden-section refine
+			const double g0 = 10.0 * std::log10((refSumSq_ + 1e-30) / (sumSq + 1e-30));
+			double best = 1e30, bg = g0;
+			for (double g = g0 - 9; g <= g0 + 9.01; g += 1.5)
 			{
 				const double d = evalAt(g, nullptr, nullptr, nullptr);
 				if (d < best) { best = d; bg = g; }
 			}
-			for (double g = bg - 2.5; g <= bg + 2.5; g += 0.5)
 			{
-				const double d = evalAt(g, nullptr, nullptr, nullptr);
-				if (d < best) { best = d; bg = g; }
+				const double phi = 0.6180339887;
+				double lo = bg - 1.5, hi = bg + 1.5;
+				double a = hi - phi * (hi - lo), b = lo + phi * (hi - lo);
+				double fa = evalAt(a, nullptr, nullptr, nullptr), fb = evalAt(b, nullptr, nullptr, nullptr);
+				for (int it = 0; it < 8; ++it)
+				{
+					if (fa < fb) { hi = b; b = a; fb = fa; a = hi - phi * (hi - lo); fa = evalAt(a, nullptr, nullptr, nullptr); }
+					else         { lo = a; a = b; fa = fb; b = lo + phi * (hi - lo); fb = evalAt(b, nullptr, nullptr, nullptr); }
+				}
+				const double gm = 0.5 * (lo + hi), fm = evalAt(gm, nullptr, nullptr, nullptr);
+				if (fm < best) { best = fm; bg = gm; }
 			}
 			gainDb = bg;
 			dist[0] = evalAt(gainDb, &attackDist, &envDist, &deltaDist[0]);
