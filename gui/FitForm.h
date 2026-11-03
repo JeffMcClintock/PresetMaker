@@ -47,7 +47,7 @@ private:
 	struct Status
 	{
 		bool running = false, finished = false;
-		std::string line;                 // progress
+		std::string line, detail;         // progress / outcome, and where the preset went
 		std::vector<std::string> results; // the lines that matter once done
 		unsigned version = 0;
 	};

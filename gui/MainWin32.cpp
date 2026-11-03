@@ -10,7 +10,7 @@ namespace
 {
 constexpr DWORD kStyle = WS_OVERLAPPEDWINDOW;
 constexpr wchar_t kClass[] = L"PresetMakerToplevel";
-constexpr int kWidthDips = 640, kHeightDips = 460;
+constexpr int kWidthDips = 640, kHeightDips = 520;
 
 // DPI awareness + STA; first member, since DrawingFrame's construction needs COM for its WIC factory.
 struct ComApartment

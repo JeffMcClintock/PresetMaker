@@ -168,24 +168,26 @@ void FitForm::startFit()
 	worker_ = std::thread([this, o] {
 		CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 		auto post = [this](auto&& f) { std::lock_guard lock(mx_); f(status_); ++status_.version; };
-		std::vector<std::string> results;
 		auto log = [&](const std::string& l) {
-			if (l.rfind("key ", 0) == 0 || l.rfind("held-out", 0) == 0 || l.rfind("wrote", 0) == 0 || l.rfind("fitting", 0) == 0)
-				post([&](Status& s) { s.results.push_back(l); });
+			// per-note scores only; the breakdown after "(fine" is in preset.txt's folder, not on screen
+			if (l.rfind("key ", 0) == 0 || l.rfind("held-out key", 0) == 0 || l.rfind("vstpreset failed", 0) == 0)
+				post([&](Status& s) { s.results.push_back(l.substr(0, l.find(" (fine"))); });
 		};
 		const FitResult r = runFit(o, ScoreWeights{}, [&](const FitProgress& p) {
-			post([&](Status& s) { s.line = std::format("{} of {} renders, best {:.4f}, step {:.3f}, {:.0f} s", p.evals, p.budget, p.best, p.sigma, p.seconds); });
+			post([&](Status& s) { s.line = std::format("RUNNING: {} of {} renders, best {:.4f}, step {:.3f}, {:.0f} s", p.evals, p.budget, p.best, p.sigma, p.seconds); });
 			return !cancel_.load();
 		}, log);
+		std::string line, detail;
 		if (r.ok)
 		{
-			post([&](Status& s) { s.line = "checking held-out notes..."; });
-			checkPreset(o, ScoreWeights{}, r.presetTxt, log);
-			post([&](Status& s) { s.line = "done: " + r.presetTxt; });
+			post([&](Status& s) { s.line = "RUNNING: checking held-out notes..."; });
+			const double mean = checkPreset(o, ScoreWeights{}, r.presetTxt, log);
+			line = std::format("FINISHED. Held-out similarity {:.1f}%", mean);
+			detail = r.vstPreset.empty() ? "Saved " + r.presetTxt + "  (no .vstpreset: give it a preset name)" : "Saved " + r.vstPreset;
 		}
-		else
-			post([&](Status& s) { s.line = r.error; });
-		post([&](Status& s) { s.running = false; s.finished = true; });
+		else if (!r.presetTxt.empty()) { line = "CANCELLED"; detail = "Best so far saved to " + r.presetTxt; }
+		else line = "FAILED: " + r.error;
+		post([&](Status& s) { s.line = line; s.detail = detail; s.running = false; s.finished = true; });
 		CoUninitialize();
 	});
 }
@@ -277,6 +279,7 @@ void FitForm::Body()
 	Label hint1("Hold: parameters kept fixed, e.g. Volume=0.3;Pan=0.5", { 0, 0, 0, 14 });
 	Label hint2("Sample folder: WAVs named <key>_<vel>.wav, used instead of the GM target", { 0, 0, 0, 14 });
 	Spacer sp({ 0, 0, 0, kGap });
-	Label status(st.line, { 0, 0, 0, 16 });
+	Label status(st.line, { 0, 0, 0, 20 });
+	if (!st.detail.empty()) Label detail(st.detail, { 0, 0, 0, 16 });
 	for (auto& l : st.results) Label line(l, { 0, 0, 0, 16 });
 }
