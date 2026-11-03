@@ -10,7 +10,7 @@ will find the nearest thing it *can* do, and tell you how close it got.
 
 <img src="examples/FretPlucked/grand_piano_spectrogram.png" width="720"/>
 
-*gm.dls Acoustic Grand Piano (top) and the fitted FretPlucked preset (bottom) at C3, C4, C5.*
+*gm.dls Acoustic Grand Piano (top) and the fitted preset for a VSTi plugin instrument ("FretPlucked", bottom) at C3, C4, C5.*
 
 ## Get started
 
@@ -47,22 +47,23 @@ pmcli fit-batch MySynth.vst3 examples\FretPlucked\gm_strings.txt out --jobs 8
 at C3, C4 and C5 and, with `--check`, tests the preset on notes it never saw. `fit-batch` takes a
 file of `reference<TAB>Preset Name` lines and runs them `--jobs` at a time.
 
-## Example: FretPlucked
+## Example: a VSTi plugin instrument ("FretPlucked")
 
-`examples/FretPlucked/` holds twenty presets fitted for SynthEdit's FretPlucked additive string
-oscillator: the `gm_strings.txt` batch list, each result as `preset.txt`, and the `.vstpreset`
+`examples/FretPlucked/` holds twenty presets fitted for FretPlucked, a VSTi plugin instrument
+(SynthEdit's additive plucked-string oscillator): the `gm_strings.txt` batch list, each result as `preset.txt`, and the `.vstpreset`
 files. `tools/populate_presets.py` wrote them into the SynthEdit project's preset slots;
 `tools/spectro.py` draws comparison spectrograms like the one above.
 
 ### Hear it
 
-Five of the presets playing the same short tune as the gm.dls instrument they were fitted to,
+Five of the presets playing the same short tune as the gm.dls instrument they were fitted to
+(target: the Windows General MIDI sample; fitted: the VSTi plugin with the preset PresetMaker found),
 rendered by `tools/demo_tunes.py` (16-bit 48 kHz mono, 6.5 s, both files normalised to the same
 peak). **[Play them in the browser](https://jeffmcclintock.github.io/PresetMaker/examples/FretPlucked/audio/)**,
 or download the files below (GitHub does not play WAV inline). The score is the held-out
 similarity from `--check` (notes the fit never saw).
 
-| instrument | gm.dls target | FretPlucked fitted | held-out |
+| instrument | gm.dls target | VSTi plugin fitted | held-out |
 |---|---|---|---|
 | Acoustic Grand Piano | [target](examples/FretPlucked/audio/acoustic_grand_piano_target.wav) | [fitted](examples/FretPlucked/audio/acoustic_grand_piano_fitted.wav) | 34.1% |
 | Harpsichord | [target](examples/FretPlucked/audio/harpsichord_target.wav) | [fitted](examples/FretPlucked/audio/harpsichord_fitted.wav) | 34.1% |

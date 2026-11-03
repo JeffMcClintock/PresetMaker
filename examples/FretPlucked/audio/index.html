@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FretPlucked demos</title>
+<title>PresetMaker demos</title>
 <style>
   :root { --bg: #fff; --fg: #1f2328; --muted: #656d76; --line: #d0d7de; --accent: #0969da; }
   @media (prefers-color-scheme: dark) {
@@ -26,12 +26,12 @@
 </head>
 <body>
 <main>
-<h1>FretPlucked presets fitted by PresetMaker</h1>
-<p>The same short tune played by the gm.dls instrument (target) and by the FretPlucked
-preset the fit found (fitted). The score is similarity on notes the fit never saw.
+<h1>Presets fitted by PresetMaker for a VSTi plugin instrument</h1>
+<p>The same short tune played by the Windows General MIDI sample (target) and by a VSTi plugin
+instrument ("FretPlucked") using the preset PresetMaker found for it (fitted). The score is similarity on notes the fit never saw.
 <a href="https://github.com/JeffMcClintock/PresetMaker">PresetMaker on GitHub</a>.</p>
 <table>
-<tr><th>instrument</th><th>gm.dls target</th><th>FretPlucked fitted</th><th>held-out</th></tr>
+<tr><th>instrument</th><th>gm.dls target</th><th>VSTi plugin fitted</th><th>held-out</th></tr>
 <tr><td>Acoustic Grand Piano</td><td><audio controls preload="none" src="acoustic_grand_piano_target.wav"></audio></td><td><audio controls preload="none" src="acoustic_grand_piano_fitted.wav"></audio></td><td class="score">34.1%</td></tr>
 <tr><td>Harpsichord</td><td><audio controls preload="none" src="harpsichord_target.wav"></audio></td><td><audio controls preload="none" src="harpsichord_fitted.wav"></audio></td><td class="score">34.1%</td></tr>
 <tr><td>Nylon Guitar</td><td><audio controls preload="none" src="nylon_guitar_target.wav"></audio></td><td><audio controls preload="none" src="nylon_guitar_fitted.wav"></audio></td><td class="score">34.3%</td></tr>
