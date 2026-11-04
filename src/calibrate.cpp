@@ -13,10 +13,10 @@
 #include "Dls.h"
 #include "GmRender.h"
 #include "Metrics.h"
+#include "Platform.h"
 
 namespace
 {
-const char* kDls = "C:\\Windows\\System32\\drivers\\gm.dls";
 constexpr int kSr = 48000;
 
 Audio resample(const Audio& a, double ratio) // ratio > 1 raises pitch
@@ -296,7 +296,7 @@ int main(int argc, char** argv)
 {
 	const Opt o = parse(argc, argv);
 	DlsFile dls;
-	if (!dls.load(kDls)) { puts("cannot read gm.dls"); return 2; }
+	if (!dls.load(platform::gmSoundSetPath())) { puts("cannot read gm.dls"); return 2; }
 	if (o.mode == "all" || o.mode == "retrieval") retrieval(dls, o);
 	if (o.mode == "all" || o.mode == "identity") identity(dls, o);
 	if (o.mode == "neighbours") neighbours(dls, o);

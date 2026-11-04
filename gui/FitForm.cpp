@@ -6,13 +6,9 @@
 #include <format>
 #include <memory>
 
-#include <windows.h>
-#include <objbase.h>
-#include <shellapi.h>
-#include <shlobj.h>
-
 #include "experimental/builders.h"
 #include "Dls.h"
+#include "Platform.h"
 
 using namespace gmpi::ui;
 using gmpi::ui::builder::fr;
@@ -23,22 +19,13 @@ namespace
 {
 constexpr float kRow = 24.0f, kGap = 6.0f, kMargin = 12.0f, kLabelW = 150.0f, kButtonW = 90.0f, kTabsH = 32.0f;
 
-std::string documentsFolder()
-{
-	wchar_t docs[MAX_PATH]{};
-	SHGetFolderPathW(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, docs);
-	char out[MAX_PATH * 3]{};
-	WideCharToMultiByte(CP_UTF8, 0, docs, -1, out, sizeof out, nullptr, nullptr);
-	return out;
-}
-
 // "0 Piano 1=0,1 Piano 2=1,..." for the combo box, and the names by program number
 std::string gmProgramList(std::vector<std::string>& names)
 {
 	DlsFile dls;
 	std::string r;
 	names.assign(128, "");
-	if (dls.load("C:\\Windows\\System32\\drivers\\gm.dls"))
+	if (dls.load(platform::gmSoundSetPath()))
 		for (auto& i : dls.instruments)
 			if (!i.drum && i.bank == 0 && i.program < 128)
 			{
@@ -75,7 +62,7 @@ bool ignoredByDefault(std::string title)
 
 FitForm::FitForm()
 {
-	s_.outDir = documentsFolder() + "\\PresetMaker";
+	s_.outDir = platform::documentsFolder() + "\\PresetMaker";
 	gmList_ = gmProgramList(gmNames_);
 	autoName();
 	refreshStates();
@@ -214,7 +201,7 @@ void FitForm::startFit()
 	o.outDir = safeFolder(s_.outDir, s_.name);
 
 	worker_ = std::thread([this, o] {
-		CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+		platform::ThreadRuntime runtime;
 		auto post = [this](auto&& f) { std::lock_guard lock(mx_); f(status_); ++status_.version; };
 		auto log = [&](const std::string& l) {
 			// per-note scores only; the breakdown after "(fine" is in preset.txt's folder, not on screen
@@ -239,7 +226,6 @@ void FitForm::startFit()
 		else if (!r.presetTxt.empty()) { line = "CANCELLED"; detail = "Best so far saved to " + r.presetTxt; }
 		else line = "FAILED: " + r.error;
 		post([&](Status& s) { s.line = line; s.detail = detail; if (r.ok) s.fraction = 1; s.running = false; s.finished = true; });
-		CoUninitialize();
 	});
 }
 
@@ -306,9 +292,8 @@ void FitForm::startBatch()
 			post([&](Status& s) { s.results.push_back(line); s.fraction = overall(); });
 		};
 		auto work = [&] {
-			CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+			platform::ThreadRuntime runtime;
 			for (size_t i; (i = next++) < n && !cancel_;) fitOne(i);
-			CoUninitialize();
 		};
 		std::vector<std::thread> pool;
 		for (int t = 0; t < threads; ++t) pool.emplace_back(work);
@@ -412,9 +397,9 @@ void FitForm::fitPage(gmpi::drawing::Rect area)
 		open.view->onClick = [this] {
 			Vst3Plugin vst;
 			std::string err;
-			const std::string dir = vst.load(s_.plugin, err) ? vst.defaultPresetDir() : documentsFolder() + "\\VST3 Presets";
+			const std::string dir = vst.load(s_.plugin, err) ? vst.defaultPresetDir() : platform::documentsFolder() + "\\VST3 Presets";
 			std::filesystem::create_directories(dir);
-			ShellExecuteA(nullptr, "open", dir.c_str(), nullptr, nullptr, SW_SHOW);
+			platform::openFolder(dir);
 		};
 		all_ = s_.all;
 		ToggleSwitch all("All 128 GM programs", all_);

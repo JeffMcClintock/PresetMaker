@@ -7,10 +7,8 @@
 #include <string>
 #include <vector>
 
-#include <windows.h>
-#include <objbase.h>
-
 #include "Fit.h"
+#include "Platform.h"
 
 namespace
 {
@@ -108,8 +106,7 @@ int fitBatch(const Args& a, const std::string& plugin, const std::string& list, 
 	std::ifstream in(list);
 	if (!in) { print("cannot read " + list); return 2; }
 	std::filesystem::create_directories(outDir);
-	char exe[MAX_PATH];
-	GetModuleFileNameA(nullptr, exe, MAX_PATH);
+	const std::string exe = platform::executablePath();
 
 	// options pass through untouched; the batch-only ones are dropped
 	std::string passthrough;
@@ -120,7 +117,7 @@ int fitBatch(const Args& a, const std::string& plugin, const std::string& list, 
 		passthrough += " " + quote(s);
 	}
 
-	struct Job { std::string ref, name, dir; PROCESS_INFORMATION pi{}; HANDLE log{}; bool done = false; };
+	struct Job { std::string ref, name, dir; std::unique_ptr<platform::Process> proc; bool done = false; };
 	std::vector<Job> jobs;
 	for (std::string line; std::getline(in, line);)
 	{
@@ -133,7 +130,7 @@ int fitBatch(const Args& a, const std::string& plugin, const std::string& list, 
 		std::string safe = j.name;
 		for (auto& c : safe) if (strchr("\\/:*?\"<>| ", c)) c = '_';
 		j.dir = outDir + "/" + safe;
-		jobs.push_back(j);
+		jobs.push_back(std::move(j));
 	}
 	print(std::format("{} fits, {} at a time", jobs.size(), a.jobs));
 
@@ -143,16 +140,11 @@ int fitBatch(const Args& a, const std::string& plugin, const std::string& list, 
 		while (next < jobs.size() && running < static_cast<size_t>(a.jobs))
 		{
 			Job& j = jobs[next++];
-			SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
 			std::filesystem::create_directories(j.dir);
-			j.log = CreateFileA((j.dir + "/fit.log").c_str(), GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, 0, nullptr);
 			std::string cmd = quote(exe) + " fit " + quote(plugin) + " " + quote(j.ref) + " " + quote(j.dir) + passthrough + " --name " + quote(j.name);
 			cmd += " --check";
-			STARTUPINFOA si{sizeof si};
-			si.dwFlags = STARTF_USESTDHANDLES;
-			si.hStdOutput = si.hStdError = j.log;
-			si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-			if (!CreateProcessA(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &j.pi))
+			j.proc = platform::Process::start(cmd, j.dir + "/fit.log");
+			if (!j.proc)
 			{
 				print("failed to start " + j.name);
 				j.done = true; ++finished;
@@ -161,16 +153,15 @@ int fitBatch(const Args& a, const std::string& plugin, const std::string& list, 
 			print("started " + j.name);
 			++running;
 		}
-		std::vector<HANDLE> hs;
-		for (auto& j : jobs) if (j.pi.hProcess && !j.done) hs.push_back(j.pi.hProcess);
-		if (hs.empty()) break;
-		const DWORD r = WaitForMultipleObjects(static_cast<DWORD>(hs.size()), hs.data(), FALSE, INFINITE);
+		std::vector<platform::Process*> live;
+		for (auto& j : jobs) if (j.proc && !j.done) live.push_back(j.proc.get());
+		if (live.empty()) break;
+		int code = 0;
+		platform::Process* const ended = live[platform::Process::waitAny(live, code)];
 		for (auto& j : jobs)
-			if (!j.done && j.pi.hProcess == hs[r - WAIT_OBJECT_0])
+			if (!j.done && j.proc.get() == ended)
 			{
-				DWORD code = 0;
-				GetExitCodeProcess(j.pi.hProcess, &code);
-				CloseHandle(j.pi.hProcess); CloseHandle(j.pi.hThread); CloseHandle(j.log);
+				j.proc.reset();
 				j.done = true; --running; ++finished;
 				// the last "held-out mean" / "key" lines of the log summarise it
 				std::ifstream lg(j.dir + "/fit.log");
@@ -186,7 +177,7 @@ int fitBatch(const Args& a, const std::string& plugin, const std::string& list, 
 
 int main(int argc, char** argv)
 {
-	CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+	platform::ThreadRuntime runtime;
 	if (argc < 2) return usage();
 	const std::string cmd = argv[1];
 	Args a = parseArgs(argc, argv);
@@ -198,7 +189,7 @@ int main(int argc, char** argv)
 	if (cmd == "gm-list")
 	{
 		DlsFile dls;
-		if (!dls.load("C:\\Windows\\System32\\drivers\\gm.dls")) { puts("cannot read gm.dls"); return 2; }
+		if (!dls.load(platform::gmSoundSetPath())) { puts("cannot read gm.dls"); return 2; }
 		for (auto& i : dls.instruments)
 			printf("%s prog %3u bank %u  %-28s %zu regions\n", i.drum ? "drum " : "pitch", i.program, i.bank, i.name.c_str(), i.regions.size());
 		return 0;

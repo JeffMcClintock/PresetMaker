@@ -1,7 +1,11 @@
 #include "Vst3Host.h"
-#include <windows.h>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstring>
+#include <thread>
+
+#include "Platform.h"
 
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
@@ -15,7 +19,6 @@
 #include "public.sdk/source/vst/hosting/processdata.h"
 #include "public.sdk/source/vst/utility/stringconvert.h"
 #include "public.sdk/source/vst/vstpresetfile.h"
-#include <shlobj.h>
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -42,24 +45,6 @@ struct Handler : IComponentHandler
 	uint32 PLUGIN_API addRef() override { return 1; }
 	uint32 PLUGIN_API release() override { return 1; }
 };
-
-// A Debug-built plugin brings its own debug CRT, whose asserts raise a modal dialog. Send them to stderr.
-void quietDebugCrt()
-{
-	if (HMODULE crt = LoadLibraryA("ucrtbased.dll"))
-	{
-		using SetMode = int(__cdecl*)(int, int);
-		using SetFile = void*(__cdecl*)(int, void*);
-		auto setMode = reinterpret_cast<SetMode>(GetProcAddress(crt, "_CrtSetReportMode"));
-		auto setFile = reinterpret_cast<SetFile>(GetProcAddress(crt, "_CrtSetReportFile"));
-		if (setMode && setFile)
-			for (int type = 0; type < 3; ++type) // warn, error, assert
-			{
-				setMode(type, 0x1);                       // _CRTDBG_MODE_FILE
-				setFile(type, reinterpret_cast<void*>(-4)); // _CRTDBG_FILE_STDERR
-			}
-	}
-}
 
 HostApplication& hostApp()
 {
@@ -107,11 +92,8 @@ const std::string& Vst3Plugin::vendor() const { return p->vendor; }
 
 std::string Vst3Plugin::defaultPresetDir() const
 {
-	wchar_t docs[MAX_PATH]{};
-	SHGetFolderPathW(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, docs);
-	std::string r = VST3::StringConvert::convert(std::u16string(reinterpret_cast<const char16_t*>(docs)));
 	auto safe = [](std::string s) { for (auto& c : s) if (strchr("\\/:*?\"<>|", c)) c = '_'; return s; };
-	return r + "\\VST3 Presets\\" + safe(p->vendor.empty() ? "Unknown" : p->vendor) + "\\" + safe(p->name);
+	return platform::documentsFolder() + "\\VST3 Presets\\" + safe(p->vendor.empty() ? "Unknown" : p->vendor) + "\\" + safe(p->name);
 }
 
 bool Vst3Plugin::savePreset(const std::string& path, std::string& error)
@@ -149,8 +131,7 @@ std::string Vst3Plugin::describeBuses() const
 
 bool Vst3Plugin::load(const std::string& path, std::string& error)
 {
-	quietDebugCrt();
-	SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+	platform::quietPluginDialogs();
 	p->module = VST3::Hosting::Module::create(path, error);
 	if (!p->module)
 		return false;
@@ -273,7 +254,7 @@ bool Vst3Plugin::render(const NoteSpec& note, int sr, Audio& out)
 		ctx.projectTimeSamples = (b - preBlocks) * block;
 		p->processor->process(data);
 		changes.clearQueue();
-		Sleep(8);
+		std::this_thread::sleep_for(std::chrono::milliseconds(8));
 	}
 
 	bool on = false, off = false;

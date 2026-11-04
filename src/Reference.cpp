@@ -1,4 +1,5 @@
 #include "Reference.h"
+#include "Platform.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -9,8 +10,6 @@ namespace fs = std::filesystem;
 
 namespace
 {
-const char* kDls = "C:\\Windows\\System32\\drivers\\gm.dls";
-
 struct GmReference : ReferenceSource
 {
 	DlsFile dls;
@@ -84,7 +83,8 @@ std::unique_ptr<ReferenceSource> openReference(const std::string& spec, std::str
 	{
 		auto r = std::make_unique<GmReference>();
 		r->program = atoi(s.c_str());
-		if (!r->dls.load(kDls)) { error = std::string("cannot read ") + kDls; return nullptr; }
+		const std::string dls = platform::gmSoundSetPath();
+		if (!r->dls.load(dls)) { error = "cannot read " + dls; return nullptr; }
 		return r;
 	}
 	auto r = std::make_unique<WavReference>();
