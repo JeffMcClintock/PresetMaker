@@ -54,7 +54,8 @@ std::string bundleRoot(std::string path)
 bool ignoredByDefault(std::string title)
 {
 	for (auto& c : title) c = (char)tolower((unsigned char)c);
-	for (const char* w : { "volume", "gain", "output", "master", "level", "fine", "tune" })
+	// Tuning only: overall gain is fitted out by the score, and "level" would catch oscillator mix controls the fit needs.
+	for (const char* w : { "fine", "tune" })
 		if (title.find(w) != std::string::npos) return true;
 	return false;
 }

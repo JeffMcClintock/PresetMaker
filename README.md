@@ -38,8 +38,8 @@ Tick **All 128 GM programs** and **Fit all** makes a preset for every General MI
 named after it, several at a time. Budget an hour or two.
 
 The **Parameters** tab lists the plugin's parameters, each with its index and an *ignore* tick: a ticked one is
-left at its current value and not searched. Level and tuning controls are ticked for you, so the
-fit cannot trade loudness for tone or drift out of tune. Leave the rest the first time.
+left at its current value and not searched. Tuning controls are ticked for you, so the fit cannot
+drift out of tune. Leave the rest the first time.
 
 ## Command line
 
@@ -83,8 +83,8 @@ similarity from `--check` (notes the fit never saw).
 
 ## Tips
 
-- **Hold the volume.** A free gain parameter lets the search trade loudness for everything else
-  (the GUI ticks it for you; on the command line use `--fix "Volume=0.3"`).
+- **Volume is free.** Overall gain is fitted out of the score, so a master volume costs the search
+  nothing; hold one only if you want the preset at a particular level (`--fix "Volume=0.3"`).
 - **Listen, and check the pitch.** The score compares loudness in auditory bands, which hears
   timbre and envelope well but is nearly deaf to harmonicity: a plugin whose partials are stretched
   can score well and sound wrong. If the fit keeps pushing a tuning or spacing parameter away from
