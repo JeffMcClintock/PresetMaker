@@ -62,6 +62,7 @@ set(vst3_srcs
     ${VST3_SDK}/public.sdk/source/vst/vstpresetfile.cpp
 )
 
+file(GLOB pm_core_headers src/*.h)
 add_library(pm_core STATIC
     src/Dls.cpp
     src/GmRender.cpp
@@ -69,8 +70,12 @@ add_library(pm_core STATIC
     src/Vst3Host.cpp
     src/Metrics.cpp
     src/Fit.cpp
+    ${pm_core_headers}
     ${vst3_srcs}
 )
+# IDE folders: the app's own code apart from each SDK
+source_group(PresetMaker REGULAR_EXPRESSION "^${CMAKE_CURRENT_SOURCE_DIR}/(src|gui)/")
+source_group(TREE ${VST3_SDK} PREFIX "VST3 SDK" FILES ${vst3_srcs})
 target_include_directories(pm_core PUBLIC src)
 target_include_directories(pm_core SYSTEM PUBLIC ${VST3_SDK})
 target_compile_definitions(pm_core PUBLIC UNICODE _UNICODE NOMINMAX
@@ -108,10 +113,7 @@ if(PM_GUI)
         message(STATUS "PresetMaker: ${dep} = ${${DEP}_DIR}")
     endforeach()
 
-    add_executable(PresetMaker WIN32
-        gui/MainWin32.cpp
-        gui/FitForm.cpp
-        gui/FitForm.h
+    set(gmpi_ui_srcs
         ${GMPI_UI_DIR}/experimental/builders.cpp
         ${GMPI_UI_DIR}/experimental/forms.cpp
         ${GMPI_UI_DIR}/experimental/grid.cpp
@@ -122,6 +124,18 @@ if(PM_GUI)
         ${GMPI_UI_DIR}/backends/DrawingFrameWin.cpp
         ${GMPI_UI_DIR}/backends/DirectXGfx.cpp
     )
+    file(GLOB gmpi_ui_headers ${GMPI_UI_DIR}/*.h ${GMPI_UI_DIR}/experimental/*.h ${GMPI_UI_DIR}/helpers/*.h ${GMPI_UI_DIR}/backends/*.h)
+    file(GLOB gmpi_headers ${GMPI_DIR}/Core/*.h)
+    add_executable(PresetMaker WIN32
+        gui/MainWin32.cpp
+        gui/FitForm.cpp
+        gui/FitForm.h
+        ${gmpi_ui_srcs}
+        ${gmpi_ui_headers}
+        ${gmpi_headers}
+    )
+    source_group(TREE ${GMPI_UI_DIR} PREFIX gmpi_ui FILES ${gmpi_ui_srcs} ${gmpi_ui_headers})
+    source_group(TREE ${GMPI_DIR} PREFIX GMPI FILES ${gmpi_headers})
     target_include_directories(PresetMaker PRIVATE gui gui/compat ${GMPI_DIR} ${GMPI_DIR}/Core ${GMPI_UI_DIR})
     target_link_libraries(PresetMaker PRIVATE pm_core d3d11 d2d1 dwrite windowscodecs Dwmapi dxguid)
 endif()
