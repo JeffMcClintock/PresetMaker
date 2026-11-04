@@ -5,6 +5,7 @@
 #include <format>
 #include <random>
 #include "Cma.h"
+#include "Pitch.h"
 
 namespace
 {
@@ -57,10 +58,22 @@ bool loadPresetTxt(Vst3Plugin& vst, const std::string& path, const FitOptions* s
 	return true;
 }
 
-bool savePresetTxt(const Vst3Plugin& vst, const std::string& path)
+int presetTranspose(const std::string& path)
+{
+	FILE* pf = fopen(path.c_str(), "r");
+	if (!pf) return 0;
+	int t = 0;
+	for (char line[512]; fgets(line, sizeof line, pf);)
+		if (sscanf(line, "# transpose %d", &t) == 1) break;
+	fclose(pf);
+	return t;
+}
+
+bool savePresetTxt(const Vst3Plugin& vst, const std::string& path, int transpose)
 {
 	FILE* pf = fopen(path.c_str(), "w");
 	if (!pf) return false;
+	if (transpose) fprintf(pf, "# transpose %d\n", transpose);
 	for (size_t i = 0; i < vst.params().size(); ++i)
 		fprintf(pf, "%u\t%.6f\t%s\n", vst.params()[i].id, vst.values[i], vst.params()[i].title.c_str());
 	fclose(pf);
@@ -81,17 +94,59 @@ FitResult runFit(const FitOptions& o, ScoreWeights weights, std::function<bool(c
 	std::filesystem::create_directories(o.outDir);
 	const int sr = o.sampleRate;
 	std::vector<NoteSpec> notes;
-	std::vector<Scorer> scorers;
 	for (int k : o.keys)
 	{
 		NoteSpec n;
 		n.key = k; n.velocity = o.velocity; n.holdSec = o.holdSec; n.tailSec = o.tailSec;
-		Audio a;
-		if (!ref->render(n, sr, a)) { r.error = "reference has no note at key " + std::to_string(k); return r; }
-		writeWav(o.outDir + "/ref_" + std::to_string(k) + ".wav", a);
 		notes.push_back(n);
-		scorers.emplace_back(a, weights);
 	}
+	// the target at each training note, played `transpose` semitones up
+	auto renderRef = [&](const NoteSpec& n, int transpose, Audio& a) {
+		NoteSpec m = n;
+		m.key += transpose;
+		return ref->render(m, sr, a);
+	};
+	auto buildScorers = [&](int transpose, std::vector<Scorer>& scorers) {
+		scorers.clear();
+		for (auto& n : notes)
+		{
+			Audio a;
+			if (!renderRef(n, transpose, a)) { r.error = "reference has no note at key " + std::to_string(n.key + transpose); return false; }
+			scorers.emplace_back(a, weights);
+		}
+		return true;
+	};
+
+	// Octave detection: the pitch of the target against the plugin's at every training note. A
+	// candidate needs every note to agree on the same whole octave with a confident estimate on
+	// both sides; the trial below decides whether it really fits better.
+	int transpose = o.transpose, candidate = 0;
+	if (o.autoTranspose && o.start.empty())
+	{
+		std::vector<double> offsets;
+		for (auto& n : notes)
+		{
+			Audio ta, pa;
+			if (!renderRef(n, 0, ta) || !vst.render(n, sr, pa)) break;
+			const PitchEstimate t = estimatePitch(ta), p = estimatePitch(pa);
+			// a loose gate: agreement across the notes and the trial do the real deciding
+			if (t.hz <= 0 || p.hz <= 0 || t.confidence < 0.6 || p.confidence < 0.6) break;
+			offsets.push_back(12 * std::log2(p.hz / t.hz));
+		}
+		if (offsets.size() == notes.size())
+		{
+			const int oct = static_cast<int>(std::lround(offsets[0] / 12));
+			bool agree = oct != 0;
+			for (double d : offsets) agree &= std::fabs(d - 12 * oct) < 0.5;
+			if (agree) candidate = 12 * oct;
+			log(std::format("target pitch vs plugin: {:+.2f}/{:+.2f}/{:+.2f} semitones{}", offsets[0], offsets.size() > 1 ? offsets[1] : 0.0, offsets.size() > 2 ? offsets[2] : 0.0,
+			                candidate ? std::format(", trying the target {:+d}", candidate) : ""));
+		}
+		else log("target pitch: not confidently measured, no transpose");
+	}
+
+	std::vector<Scorer> scorers;
+	if (!buildScorers(transpose, scorers)) return r;
 
 	const auto free = freeParams(vst, o);
 	log(std::format("fitting {} free parameters of {} to {}, budget {} evaluations", free.size(), vst.name(), ref->describe(), o.budget));
@@ -139,14 +194,34 @@ FitResult runFit(const FitOptions& o, ScoreWeights weights, std::function<bool(c
 		p.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 		if (!progress(p)) cancelled = true;
 	};
+	// the same random sample scores both ways when there is a candidate transpose: a paired trial
+	std::vector<Scorer> altScorers;
+	double altBestF = 1e9;
+	std::vector<double> altBestX;
+	if (candidate && !buildScorers(candidate, altScorers)) return r;
 	for (int i = 0; i < (warm ? 0 : o.budget / 10) && !cancelled; ++i, ++used)
 	{
 		std::vector<double> x(free.size());
 		for (auto& v : x) v = u(rng);
 		const double f = objective(x);
 		if (f < bestF) { bestF = f; bestX = x; }
+		if (candidate)
+		{
+			std::swap(scorers, altScorers);
+			const double g = objective(x);
+			std::swap(scorers, altScorers);
+			if (g < altBestF) { altBestF = g; altBestX = x; }
+			++used;
+		}
 		if (i % 10 == 9) report(sigma0);
 	}
+	if (candidate)
+	{
+		log(std::format("trial: target as is {:.4f}, target {:+d} semitones {:.4f}", bestF, candidate, altBestF));
+		if (altBestF < bestF) { transpose = candidate; std::swap(scorers, altScorers); bestF = altBestF; bestX = altBestX; }
+	}
+	if (transpose) log(std::format("target played {:+d} semitones; the preset's sound sits where the plugin plays it", transpose));
+	for (auto& n : notes) { Audio a; renderRef(n, transpose, a); writeWav(o.outDir + "/ref_" + std::to_string(n.key) + ".wav", a); }
 	if (!warm) log(std::format("after random seeding ({} evals): {:.4f}", used, bestF));
 
 	SepCma cma(bestX, sigma0);
@@ -161,8 +236,9 @@ FitResult runFit(const FitOptions& o, ScoreWeights weights, std::function<bool(c
 
 	apply(bestX);
 	r.trainBest = bestF;
+	r.transpose = transpose;
 	r.presetTxt = o.outDir + "/preset.txt";
-	savePresetTxt(vst, r.presetTxt);
+	savePresetTxt(vst, r.presetTxt, transpose);
 	for (size_t i = 0; i < notes.size(); ++i)
 	{
 		Audio a;
@@ -195,6 +271,8 @@ double checkPreset(const FitOptions& o, ScoreWeights weights, const std::string&
 	vst.preRollSec = o.preRollSec;
 	applyFixed(vst, o);
 	if (!loadPresetTxt(vst, presetTxt)) { log("cannot read " + presetTxt); return 0; }
+	const int transpose = presetTranspose(presetTxt);
+	if (transpose) log(std::format("target played {:+d} semitones, as fitted", transpose));
 	const int checks[][2] = {{43, 100}, {55, 100}, {67, 100}, {79, 100}, {60, 60}, {60, 120}};
 	double sum = 0;
 	int n = 0;
@@ -202,8 +280,10 @@ double checkPreset(const FitOptions& o, ScoreWeights weights, const std::string&
 	{
 		NoteSpec note;
 		note.key = c[0]; note.velocity = c[1]; note.holdSec = o.holdSec; note.tailSec = o.tailSec;
+		NoteSpec target = note;
+		target.key += transpose;
 		Audio refA, a;
-		if (!ref->render(note, o.sampleRate, refA) || !vst.render(note, o.sampleRate, a)) { log(std::format("key {} vel {}: no render", c[0], c[1])); continue; }
+		if (!ref->render(target, o.sampleRate, refA) || !vst.render(note, o.sampleRate, a)) { log(std::format("key {} vel {}: no render", c[0], c[1])); continue; }
 		const Score s = Scorer(refA, weights).compare(a);
 		sum += s.similarity();
 		++n;

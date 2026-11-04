@@ -18,6 +18,7 @@ double thresholdQuiet(double hz)
 	const double k = std::clamp(hz, 20.0, 20000.0) / 1000.0;
 	return 3.64 * std::pow(k, -0.8) - 6.5 * std::exp(-0.6 * (k - 3.3) * (k - 3.3)) + 1e-3 * std::pow(k, 4.0);
 }
+} // namespace
 
 void fft(std::vector<std::complex<float>>& a)
 {
@@ -45,6 +46,9 @@ void fft(std::vector<std::complex<float>>& a)
 		}
 	}
 }
+
+namespace
+{
 
 struct BandMap
 {

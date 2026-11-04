@@ -220,7 +220,7 @@ void FitForm::startFit()
 		{
 			post([&](Status& s) { s.line = "RUNNING: checking held-out notes..."; s.fraction = 0.9f; });
 			const double mean = checkPreset(o, ScoreWeights{}, r.presetTxt, log);
-			line = std::format("FINISHED. Held-out similarity {:.1f}%", mean);
+			line = std::format("FINISHED. Held-out similarity {:.1f}%{}", mean, r.transpose ? std::format(", target played {:+d} semitones", r.transpose) : "");
 			detail = r.vstPreset.empty() ? "Saved " + r.presetTxt + "  (no .vstpreset: give it a preset name)" : "Saved " + r.vstPreset;
 		}
 		else if (!r.presetTxt.empty()) { line = "CANCELLED"; detail = "Best so far saved to " + r.presetTxt; }
@@ -284,7 +284,7 @@ void FitForm::startBatch()
 				setFrac(0.9f);
 				const double mean = checkPreset(o, ScoreWeights{}, r.presetTxt, [](const std::string&) {});
 				{ std::lock_guard l(fm); means[i] = mean; }
-				line = std::format("{}: held-out {:.1f}%{}", jobs[i].name, mean, r.vstPreset.empty() ? "  (no .vstpreset)" : "");
+				line = std::format("{}: held-out {:.1f}%{}{}", jobs[i].name, mean, r.transpose ? std::format(", target {:+d} st", r.transpose) : "", r.vstPreset.empty() ? "  (no .vstpreset)" : "");
 			}
 			else line = jobs[i].name + ": " + (r.presetTxt.empty() ? "FAILED " + r.error : "cancelled");
 			setFrac(1.f);

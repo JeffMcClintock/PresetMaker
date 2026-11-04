@@ -27,6 +27,12 @@ struct FitOptions
 	std::vector<std::string> skip{"MIDI CC", "Pitch Bend", "Aftertouch", "Channel Pressure", "Program Change"};
 	int seed = 7;
 	int sampleRate = 48000;
+	// Semitones added to the target's key: a target pitched an octave below the plugin is played an
+	// octave up so the two can meet. Auto: whole octaves, detected from the pitch of each training
+	// note and confirmed by a trial, else 0. The preset carries no offset; the fitted sound sits
+	// where the plugin plays it.
+	int transpose = 0;
+	bool autoTranspose = true;
 };
 
 struct FitProgress
@@ -40,6 +46,7 @@ struct FitResult
 	bool ok = false;
 	std::string error;
 	std::string presetTxt, vstPreset;
+	int transpose = 0;  // what the target was played at, semitones
 	double trainBest = 0;
 	std::vector<std::pair<int, Score>> perKey;
 };
@@ -48,7 +55,8 @@ struct FitResult
 std::vector<size_t> freeParams(const Vst3Plugin& vst, const FitOptions& o);
 void applyFixed(Vst3Plugin& vst, const FitOptions& o);
 bool loadPresetTxt(Vst3Plugin& vst, const std::string& path, const FitOptions* skipFixedOf = nullptr);
-bool savePresetTxt(const Vst3Plugin& vst, const std::string& path);
+bool savePresetTxt(const Vst3Plugin& vst, const std::string& path, int transpose = 0);
+int presetTranspose(const std::string& path); // the "# transpose N" line, else 0
 
 // progress returns false to cancel. log receives one line at a time.
 FitResult runFit(const FitOptions& o, ScoreWeights weights,

@@ -89,6 +89,11 @@ similarity from `--check` (notes the fit never saw).
   timbre and envelope well but is nearly deaf to harmonicity: a plugin whose partials are stretched
   can score well and sound wrong. If the fit keeps pushing a tuning or spacing parameter away from
   neutral, hold it.
+- **Octaves are handled.** A target that sounds an octave below (or above) where the plugin plays
+  the same key, as the GM organs do, is played an octave up so the two can meet. The pitch of each
+  training note is compared with the plugin's and, when every note agrees on a whole octave, a
+  short trial decides. The log and the GUI say when it happened; the preset carries no offset,
+  so the fitted sound sits where the plugin plays it. `--transpose 0` turns this off.
 - **Expect a ceiling.** Around 35% similarity on the held-out notes is a good fit for a sound the
   plugin can genuinely make; under 20% means the target is outside what it can do (distorted,
   bowed, or an attack it has no model for), and no budget will change that.
@@ -120,6 +125,8 @@ The target can be anything you can record: a real instrument, a hardware synth, 
 | `--name "X"` `--preset-dir D` `--no-vstpreset` | | the `.vstpreset`: its name, somewhere other than the standard folder, or none |
 | `--check` | | held-out test after the fit (G2, G3, G4, G5, and C4 soft and loud) |
 | `--delta 0.3` | | weight of the spectral-change term in the score (see below) |
+| `--transpose N` | auto | play the target N semitones up; auto detects whole octaves (see Tips) |
+| `--seed N` | 7 | the random start; another seed gives a different search path |
 
 Other commands: `gm-render <ref> <key> <vel> out.wav`, `vst-render <plugin> <key> <vel> out.wav
 ["Title=0.5" ...]`, `score ref.wav cand.wav`, `check <plugin> <ref> preset.txt`, `export <plugin>

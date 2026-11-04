@@ -1,6 +1,9 @@
 #pragma once
+#include <complex>
 #include <vector>
 #include "Wav.h"
+
+void fft(std::vector<std::complex<float>>& a); // in place; the size is a power of two
 
 // Perceptual distance between a reference note and a candidate render. Lower is better.
 //

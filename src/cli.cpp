@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "Fit.h"
+#include "Pitch.h"
 #include "Platform.h"
 
 namespace
@@ -21,6 +22,7 @@ int usage()
 	     "pmcli vst-params <plugin.vst3>\n"
 	     "pmcli vst-render <plugin.vst3> <key> <vel> <out.wav> [\"Title=0..1\" ...]\n"
 	     "pmcli score <ref.wav> <cand.wav>\n"
+	     "pmcli pitch <note.wav>\n"
 	     "pmcli fit <plugin.vst3> <reference> <outdir> [options]\n"
 	     "pmcli check <plugin.vst3> <reference> <preset.txt> [options]\n"
 	     "pmcli export <plugin.vst3> <preset.txt> <name> [--preset-dir D]\n"
@@ -31,7 +33,8 @@ int usage()
 	     "options: --evals N (1200)  --keys 48,60,72  --vel 100  --hold 1.5  --tail 0.5\n"
 	     "         --fix \"Title=v;Title=v\"  --skip \"substr;substr\"  --start preset.txt  --sigma S\n"
 	     "         --preroll S (0.15)  --name \"Preset Name\" (writes a .vstpreset)  --preset-dir D\n"
-	     "         --no-vstpreset  --delta W (spectral-change weight, 0.3)");
+	     "         --no-vstpreset  --delta W (spectral-change weight, 0.3)\n"
+	     "         --transpose N (play the target N semitones up; default: whole octaves detected)");
 	return 1;
 }
 
@@ -91,6 +94,7 @@ Args parseArgs(int argc, char** argv)
 		else if (s == "--delta") a.w.wDelta = atof(next().c_str());
 		else if (s == "--jobs") a.jobs = atoi(next().c_str());
 		else if (s == "--seed") a.o.seed = atoi(next().c_str());
+		else if (s == "--transpose") { a.o.transpose = atoi(next().c_str()); a.o.autoTranspose = false; }
 		else a.positional.push_back(s);
 	}
 	return a;
@@ -229,6 +233,14 @@ int main(int argc, char** argv)
 		const FitResult r = runFit(a.o, a.w, [](const FitProgress&) { return true; }, print);
 		if (!r.ok) { print(r.error); return 2; }
 		if (doCheck) checkPreset(a.o, a.w, r.presetTxt, print);
+		return 0;
+	}
+	if (cmd == "pitch" && pos.size() >= 1)
+	{
+		Audio a;
+		if (!readWav(pos[0], a)) { print("cannot read " + pos[0]); return 2; }
+		const PitchEstimate p = estimatePitch(a);
+		print(std::format("{:.2f} Hz  midi {:.2f}  confidence {:.2f}", p.hz, p.hz > 0 ? 69 + 12 * std::log2(p.hz / 440) : 0.0, p.confidence));
 		return 0;
 	}
 	if (cmd == "check" && pos.size() >= 3)
