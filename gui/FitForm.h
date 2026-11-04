@@ -41,6 +41,7 @@ private:
 	{
 		std::string plugin, sampleFolder, name, outDir;
 		bool nameAuto = true; // the name follows the target until the user types one
+		bool all = false;     // every GM program, a preset each, several at a time
 		int gmProgram = 0, evals = 600;
 		double preRoll = 0.15;
 	} s_;
@@ -50,6 +51,7 @@ private:
 	gmpi_forms::State<std::string> pluginText_, folderText_, nameText_, outDirText_, evalsText_, preRollText_, gmList_;
 	gmpi_forms::State<int32_t> gmProgram_, page_;
 	gmpi_forms::State<float> progress_;
+	gmpi_forms::State<bool> all_;
 	void refreshStates();
 
 	// the chosen plugin's parameters, one Ignore tick each; rebuilt in Body() (visuals are gone
@@ -76,7 +78,9 @@ private:
 	std::atomic<bool> cancel_{false};
 	std::thread worker_;
 	unsigned shownVersion_ = 0;
+	FitOptions fitOptions() const; // from the settings and the Ignore ticks; no target or folder yet
 	void startFit();
+	void startBatch();
 	void joinWorker();
 
 	gmpi::drawing::Rect bounds_{};

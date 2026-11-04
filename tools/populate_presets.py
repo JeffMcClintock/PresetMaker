@@ -6,7 +6,8 @@ presets.json: [{"slot": 1, "name": "Nylon Guitar", "category": "Guitar", "preset
 preset.txt lines are "<vst param id>\t<normalised 0..1>\t<title>", as written by `pmcli fit`.
 
 Project values are stored in native units, linear between RangeMinimum (default 0) and RangeMaximum
-(default 10); enum parameters (type 0) store the item index. Slots not listed keep their old values.
+(default 10); enum parameters (type 0) store the item index, bools (type 4) 0 or 1. Slots not listed
+keep their old values.
 """
 import json
 import re
@@ -40,6 +41,8 @@ def native(attrs, norm):
     if attrs.get('type') == '0':  # enum: index
         items = attrs.get('MetaData', '').split(',')
         return str(int(round(norm * (len(items) - 1))))
+    if attrs.get('type') == '4':  # bool
+        return '1' if norm >= 0.5 else '0'
     lo = float(attrs.get('RangeMinimum', 0))
     hi = float(attrs.get('RangeMaximum', 10))
     return f'{lo + norm * (hi - lo):.6g}'

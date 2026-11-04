@@ -34,6 +34,9 @@ playing in the browser. The presets themselves are in [`examples/FretPlucked/`](
 Also in the output folder: `fit_*.wav` and `ref_*.wav`, the fitted plugin and the target playing
 the same notes, so you can hear how close it got.
 
+Tick **All 128 GM programs** and **Fit all** makes a preset for every General MIDI instrument,
+named after it, several at a time. Budget an hour or two.
+
 The **Parameters** tab lists the plugin's parameters with an *ignore* tick each: a ticked one is
 left at its current value and not searched. Level and tuning controls are ticked for you, so the
 fit cannot trade loudness for tone or drift out of tune. Leave the rest the first time.

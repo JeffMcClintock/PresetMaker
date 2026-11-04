@@ -173,8 +173,30 @@ bool FitForm::onTimer()
 	return true;
 }
 
+FitOptions FitForm::fitOptions() const
+{
+	FitOptions o;
+	o.plugin = s_.plugin;
+	o.budget = s_.evals;
+	o.preRollSec = s_.preRoll;
+	for (size_t i = 0; i < params_.size(); ++i)
+		if (ignore_[i]->get()) o.fixedById[params_[i].id] = params_[i].value;
+	return o;
+}
+
+namespace
+{
+std::string safeFolder(const std::string& base, std::string name)
+{
+	if (name.empty()) name = "fit";
+	for (auto& c : name) if (strchr("\\/:*?\"<>|", c)) c = '_';
+	return base + "\\" + name;
+}
+} // namespace
+
 void FitForm::startFit()
 {
+	if (s_.all) { startBatch(); return; }
 	{
 		std::lock_guard lock(mx_);
 		if (status_.running) return;
@@ -186,17 +208,10 @@ void FitForm::startFit()
 	cancel_ = false;
 	joinWorker();
 
-	FitOptions o;
-	o.plugin = s_.plugin;
+	FitOptions o = fitOptions();
 	o.reference = s_.sampleFolder.empty() ? std::to_string(s_.gmProgram) : s_.sampleFolder;
 	o.name = s_.name;
-	o.budget = s_.evals;
-	o.preRollSec = s_.preRoll;
-	for (size_t i = 0; i < params_.size(); ++i)
-		if (ignore_[i]->get()) o.fixedById[params_[i].id] = params_[i].value;
-	std::string safe = s_.name.empty() ? "fit" : s_.name;
-	for (auto& c : safe) if (strchr("\\/:*?\"<>|", c)) c = '_';
-	o.outDir = s_.outDir + "\\" + safe;
+	o.outDir = safeFolder(s_.outDir, s_.name);
 
 	worker_ = std::thread([this, o] {
 		CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -225,6 +240,85 @@ void FitForm::startFit()
 		else line = "FAILED: " + r.error;
 		post([&](Status& s) { s.line = line; s.detail = detail; if (r.ok) s.fraction = 1; s.running = false; s.finished = true; });
 		CoUninitialize();
+	});
+}
+
+// Every GM program the gm.dls has, a preset each, named after the instrument. Several run at once,
+// each on its own thread with its own plugin instance, the way a DAW runs several instances.
+void FitForm::startBatch()
+{
+	{
+		std::lock_guard lock(mx_);
+		if (status_.running) return;
+		status_ = {};
+		status_.running = true;
+		status_.line = "starting...";
+		++status_.version;
+	}
+	cancel_ = false;
+	joinWorker();
+
+	struct Job { int program; std::string name; };
+	std::vector<Job> jobs;
+	for (int p = 0; p < (int)gmNames_.size(); ++p)
+		if (!gmNames_[p].empty()) jobs.push_back({ p, gmNames_[p] });
+	const FitOptions base = fitOptions();
+	const std::string outDir = s_.outDir;
+	const int threads = std::clamp<int>(std::thread::hardware_concurrency() / 2, 1, 8);
+
+	worker_ = std::thread([this, jobs, base, outDir, threads] {
+		const size_t n = jobs.size();
+		std::atomic<size_t> next{0}, done{0};
+		std::vector<float> inFlight(n, 0.f); // each job's own progress, for the overall bar
+		std::vector<double> means(n, -1);
+		std::mutex fm;
+		auto post = [this](auto&& f) { std::lock_guard lock(mx_); f(status_); ++status_.version; };
+		auto overall = [&] {
+			float sum = 0;
+			{ std::lock_guard l(fm); for (float f : inFlight) sum += f; }
+			return sum / float(std::max<size_t>(1, n));
+		};
+		auto fitOne = [&](size_t i) {
+			FitOptions o = base;
+			o.reference = std::to_string(jobs[i].program);
+			o.name = jobs[i].name;
+			o.outDir = safeFolder(outDir, jobs[i].name);
+			auto setFrac = [&](float f) { std::lock_guard l(fm); inFlight[i] = f; };
+			const FitResult r = runFit(o, ScoreWeights{}, [&](const FitProgress& p) {
+				setFrac(0.9f * float(p.evals) / float(std::max(1, p.budget)));
+				post([&](Status& s) {
+					s.line = std::format("RUNNING: {} of {} presets done, {} fitting", done.load(), n, std::min<size_t>(threads, n - done.load()));
+					s.fraction = overall();
+				});
+				return !cancel_.load();
+			}, [](const std::string&) {});
+			std::string line;
+			if (r.ok)
+			{
+				setFrac(0.9f);
+				const double mean = checkPreset(o, ScoreWeights{}, r.presetTxt, [](const std::string&) {});
+				{ std::lock_guard l(fm); means[i] = mean; }
+				line = std::format("{}: held-out {:.1f}%{}", jobs[i].name, mean, r.vstPreset.empty() ? "  (no .vstpreset)" : "");
+			}
+			else line = jobs[i].name + ": " + (r.presetTxt.empty() ? "FAILED " + r.error : "cancelled");
+			setFrac(1.f);
+			++done;
+			post([&](Status& s) { s.results.push_back(line); s.fraction = overall(); });
+		};
+		auto work = [&] {
+			CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+			for (size_t i; (i = next++) < n && !cancel_;) fitOne(i);
+			CoUninitialize();
+		};
+		std::vector<std::thread> pool;
+		for (int t = 0; t < threads; ++t) pool.emplace_back(work);
+		for (auto& t : pool) t.join();
+
+		int ok = 0; double sum = 0;
+		for (double m : means) if (m >= 0) { ++ok; sum += m; }
+		std::string line = cancel_ ? std::format("CANCELLED after {} of {} presets", ok, n)
+		                           : std::format("FINISHED. {} presets, mean held-out similarity {:.1f}%", ok, ok ? sum / ok : 0.0);
+		post([&](Status& s) { s.line = line; s.detail = "Saved to the plugin's VST3 Presets folder (Presets...)"; s.fraction = cancel_ ? s.fraction : 1; s.running = false; s.finished = true; });
 	});
 }
 
@@ -308,8 +402,8 @@ void FitForm::fitPage(gmpi::drawing::Rect area)
 		TextEdit e(outDirText_, [this](const std::string& v) { s_.outDir = v; refreshStates(); });
 	}
 	{
-		Grid row({ .gap = kGap, .auto_rows = kRow, .auto_flow = eAutoFlow::columns, .column_widths = { kButtonW, kButtonW, kButtonW, fr(1.0f) } }, {});
-		Button fit(running ? "Fitting..." : "Fit");
+		Grid row({ .gap = kGap, .auto_rows = kRow, .auto_flow = eAutoFlow::columns, .column_widths = { kButtonW, kButtonW, kButtonW, 210.0f, fr(1.0f) } }, {});
+		Button fit(running ? "Fitting..." : s_.all ? "Fit all" : "Fit");
 		fit.view->accent = !running;
 		fit.view->onClick = [this] { if (!s_.plugin.empty()) startFit(); };
 		Button cancel("Cancel");
@@ -322,6 +416,9 @@ void FitForm::fitPage(gmpi::drawing::Rect area)
 			std::filesystem::create_directories(dir);
 			ShellExecuteA(nullptr, "open", dir.c_str(), nullptr, nullptr, SW_SHOW);
 		};
+		all_ = s_.all;
+		ToggleSwitch all("All 128 GM programs", all_);
+		all.view->validateAndSave = [this](bool on) { s_.all = on; rebuild(); };
 		Label filler("");
 	}
 	size_t held = 0;
