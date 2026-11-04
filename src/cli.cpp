@@ -20,7 +20,7 @@ int usage()
 	puts("pmcli gm-list\n"
 	     "pmcli gm-render <program> <key> <vel> <out.wav>\n"
 	     "pmcli vst-params <plugin.vst3>\n"
-	     "pmcli vst-render <plugin.vst3> <key> <vel> <out.wav> [\"Title=0..1\" ...]\n"
+	     "pmcli vst-render <plugin.vst3> <key> <vel> <out.wav> [--start preset.txt] [\"Title=0..1\" ...]\n"
 	     "pmcli score <ref.wav> <cand.wav>\n"
 	     "pmcli pitch <note.wav>\n"
 	     "pmcli fit <plugin.vst3> <reference> <outdir> [options]\n"
@@ -274,6 +274,7 @@ int main(int argc, char** argv)
 		NoteSpec n;
 		n.key = atoi(pos[1].c_str()); n.velocity = atoi(pos[2].c_str());
 		n.holdSec = a.o.holdSec; n.tailSec = a.o.tailSec;
+		if (!a.o.start.empty() && !loadPresetTxt(vst, a.o.start)) { print("cannot read " + a.o.start); return 2; }
 		for (size_t i = 4; i < pos.size(); ++i) // optional "Parameter Title=0..1" overrides
 		{
 			const auto eq = pos[i].rfind('=');
