@@ -9,6 +9,7 @@ namespace platform
 {
 std::string documentsFolder();   // the user's Documents, UTF-8
 std::string gmSoundSetPath();    // the system General MIDI sound set (gm.dls)
+std::string vst3PluginFolder();  // where VST3 plugins are installed for all users
 std::string executablePath();    // this program
 void openFolder(const std::string& path); // in the file manager
 void quietPluginDialogs();       // a plugin's crash or Debug-CRT assert reports to stderr, never a dialog

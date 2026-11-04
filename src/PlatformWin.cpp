@@ -31,6 +31,15 @@ std::string gmSoundSetPath()
 	return utf8(sys) + "\\drivers\\gm.dls";
 }
 
+std::string vst3PluginFolder()
+{
+	PWSTR common = nullptr;
+	std::string r;
+	if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_ProgramFilesCommon, 0, nullptr, &common))) r = utf8(common) + "\\VST3";
+	CoTaskMemFree(common);
+	return r;
+}
+
 std::string executablePath()
 {
 	wchar_t exe[MAX_PATH]{};

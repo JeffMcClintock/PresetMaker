@@ -343,17 +343,21 @@ void FitForm::fitPage(gmpi::drawing::Rect area)
 		Label l(label);
 		return row;
 	};
-	auto browse = [&](gmpi_forms::State<std::string>& state, std::function<void(const std::string&)> save) {
+	auto browse = [&](gmpi_forms::State<std::string>& state, std::function<void(const std::string&)> save,
+	                  std::vector<std::pair<std::string, std::string>> types, std::string folder) {
 		auto b = std::make_unique<gmpi::ui::builder::FileBrowseButtonView>(gmpi::drawing::Rect{});
 		b->value.setSource(&state);
 		b->validateAndSave = std::move(save);
+		b->extensions = std::move(types);
+		b->initialDirectory = std::move(folder);
 		gmpi::ui::builder::ThreadLocalCurrentBuilder->push_back(std::move(b));
 	};
 
 	{
 		auto row = beginRow("Plugin (.vst3)", { kLabelW, fr(1.0f), kRow });
 		TextEdit e(pluginText_, [this](const std::string& v) { s_.plugin = bundleRoot(v); refreshStates(); rebuild(); });
-		browse(pluginText_, [this](const std::string& v) { s_.plugin = bundleRoot(v); refreshStates(); rebuild(); });
+		browse(pluginText_, [this](const std::string& v) { s_.plugin = bundleRoot(v); refreshStates(); rebuild(); },
+		       { { "vst3", "VST3 plugins" } }, platform::vst3PluginFolder());
 	}
 	{
 		auto row = beginRow("Target (GM)");
@@ -369,7 +373,7 @@ void FitForm::fitPage(gmpi::drawing::Rect area)
 			// a file picker: take the folder of whatever WAV was chosen
 			s_.sampleFolder = std::filesystem::path(v).parent_path().string();
 			autoName(); refreshStates(); rebuild();
-		});
+		}, { { "wav", "WAV files" } }, platform::documentsFolder());
 	}
 	{
 		auto row = beginRow("Preset name");
