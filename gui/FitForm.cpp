@@ -434,9 +434,10 @@ void FitForm::parametersPage(gmpi::drawing::Rect area)
 	          { 0, 0, area.right - area.left - 20.0f, 0 });
 	for (size_t i = 0; i < params_.size(); ++i)
 	{
-		Grid row({ .gap = kGap, .auto_rows = kRow, .auto_flow = eAutoFlow::columns, .column_widths = { kRow, fr(1.0f), 70.0f } }, {});
+		Grid row({ .gap = kGap, .auto_rows = kRow, .auto_flow = eAutoFlow::columns, .column_widths = { kRow, 36.0f, fr(1.0f), 70.0f } }, {});
 		ToggleSwitch tick("", *ignore_[i]);
 		tick.view->validateAndSave = [this, i](bool on) { *ignore_[i] = on; };
+		Label index(std::to_string(i)); // the parameter's index, as pmcli vst-params prints it; titles can repeat
 		Label title(params_[i].title);
 		Label value(std::format("{:.2f}", params_[i].value));
 	}

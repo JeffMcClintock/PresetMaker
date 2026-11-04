@@ -21,7 +21,7 @@ struct FitOptions
 	std::string start;           // preset.txt to warm-start from
 	double sigma = 0;            // initial CMA step; 0 = 0.25 cold / 0.05 warm
 	double preRollSec = 0.15;
-	std::map<std::string, double> fixed; // parameter title -> held value (left out of the fit)
+	std::map<std::string, double> fixed; // parameter title or "#index" -> held value (left out of the fit)
 	std::map<uint32_t, double> fixedById; // the same by parameter id (the GUI's Ignore ticks; titles can repeat)
 	// title substrings left out of the fit (at the plugin's value); MIDI controller parameters by default
 	std::vector<std::string> skip{"MIDI CC", "Pitch Bend", "Aftertouch", "Channel Pressure", "Program Change"};
@@ -54,6 +54,7 @@ struct FitResult
 // Parameters the search may move: tweakable, not fixed, not skipped.
 std::vector<size_t> freeParams(const Vst3Plugin& vst, const FitOptions& o);
 void applyFixed(Vst3Plugin& vst, const FitOptions& o);
+const double* fixedValue(const Vst3Plugin& vst, const FitOptions& o, size_t k); // held value for parameter k, or null
 bool loadPresetTxt(Vst3Plugin& vst, const std::string& path, const FitOptions* skipFixedOf = nullptr);
 bool savePresetTxt(const Vst3Plugin& vst, const std::string& path, int transpose = 0);
 int presetTranspose(const std::string& path); // the "# transpose N" line, else 0

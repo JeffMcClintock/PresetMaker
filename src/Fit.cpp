@@ -23,13 +23,22 @@ std::string scoreLine(const Score& s)
 }
 } // namespace
 
+// --fix "Title=v" or "#index=v" (the index as vst-params and the GUI list it; titles can repeat)
+const double* fixedValue(const Vst3Plugin& vst, const FitOptions& o, size_t k)
+{
+	if (auto it = o.fixedById.find(vst.params()[k].id); it != o.fixedById.end()) return &it->second;
+	if (auto it = o.fixed.find("#" + std::to_string(k)); it != o.fixed.end()) return &it->second;
+	if (auto it = o.fixed.find(vst.params()[k].title); it != o.fixed.end()) return &it->second;
+	return nullptr;
+}
+
 std::vector<size_t> freeParams(const Vst3Plugin& vst, const FitOptions& o)
 {
 	std::vector<size_t> free;
 	for (size_t i = 0; i < vst.params().size(); ++i)
 	{
 		auto& p = vst.params()[i];
-		if (p.tweakable && !o.fixed.count(p.title) && !o.fixedById.count(p.id) && !skipped(p, o)) free.push_back(i);
+		if (p.tweakable && !fixedValue(vst, o, i) && !skipped(p, o)) free.push_back(i);
 	}
 	return free;
 }
@@ -37,10 +46,7 @@ std::vector<size_t> freeParams(const Vst3Plugin& vst, const FitOptions& o)
 void applyFixed(Vst3Plugin& vst, const FitOptions& o)
 {
 	for (size_t k = 0; k < vst.params().size(); ++k)
-	{
-		if (auto it = o.fixed.find(vst.params()[k].title); it != o.fixed.end()) vst.values[k] = it->second;
-		if (auto it = o.fixedById.find(vst.params()[k].id); it != o.fixedById.end()) vst.values[k] = it->second;
-	}
+		if (const double* v = fixedValue(vst, o, k)) vst.values[k] = *v;
 }
 
 bool loadPresetTxt(Vst3Plugin& vst, const std::string& path, const FitOptions* skipFixedOf)
@@ -52,7 +58,7 @@ bool loadPresetTxt(Vst3Plugin& vst, const std::string& path, const FitOptions* s
 		unsigned id; double v;
 		if (sscanf(line, "%u\t%lf", &id, &v) != 2) continue;
 		for (size_t k = 0; k < vst.params().size(); ++k)
-			if (vst.params()[k].id == id && !(skipFixedOf && (skipFixedOf->fixed.count(vst.params()[k].title) || skipFixedOf->fixedById.count(id)))) vst.values[k] = v;
+			if (vst.params()[k].id == id && !(skipFixedOf && fixedValue(vst, *skipFixedOf, k))) vst.values[k] = v;
 	}
 	fclose(pf);
 	return true;

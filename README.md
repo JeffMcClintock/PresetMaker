@@ -37,7 +37,7 @@ the same notes, so you can hear how close it got.
 Tick **All 128 GM programs** and **Fit all** makes a preset for every General MIDI instrument,
 named after it, several at a time. Budget an hour or two.
 
-The **Parameters** tab lists the plugin's parameters with an *ignore* tick each: a ticked one is
+The **Parameters** tab lists the plugin's parameters, each with its index and an *ignore* tick: a ticked one is
 left at its current value and not searched. Level and tuning controls are ticked for you, so the
 fit cannot trade loudness for tone or drift out of tune. Leave the rest the first time.
 
@@ -118,7 +118,7 @@ The target can be anything you can record: a real instrument, a hardware synth, 
 | `--evals N` | 1200 | renders per fit; the search stops here |
 | `--keys 48,60,72` `--vel 100` | | the notes fitted (all keys at once; a preset must serve all of them) |
 | `--hold 1.5` `--tail 0.5` | | note length and release tail, seconds |
-| `--fix "Volume=0.3;Pan=0.5"` | | parameters held at a normalised value and left out of the search |
+| `--fix "Volume=0.3;Pan=0.5"` | | parameters held at a normalised value and left out of the search; `#17=0.3` names one by its index when titles repeat (the index as `vst-params` and the Parameters tab show it) |
 | `--skip "LFO;Reverb"` | MIDI CC etc. | parameters whose title contains the text are left out, at their plugin value |
 | `--start preset.txt` `--sigma 0.05` | | continue from an earlier result with a small step instead of starting cold |
 | `--preroll 0.25` | 0.15 | seconds of silence rendered before each note |

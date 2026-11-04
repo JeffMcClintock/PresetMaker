@@ -20,7 +20,7 @@ int usage()
 	puts("pmcli gm-list\n"
 	     "pmcli gm-render <program> <key> <vel> <out.wav>\n"
 	     "pmcli vst-params <plugin.vst3>\n"
-	     "pmcli vst-render <plugin.vst3> <key> <vel> <out.wav> [--start preset.txt] [\"Title=0..1\" ...]\n"
+	     "pmcli vst-render <plugin.vst3> <key> <vel> <out.wav> [--start preset.txt] [\"Title=0..1\" | \"#index=0..1\" ...]\n"
 	     "pmcli score <ref.wav> <cand.wav>\n"
 	     "pmcli pitch <note.wav>\n"
 	     "pmcli fit <plugin.vst3> <reference> <outdir> [options]\n"
@@ -31,7 +31,7 @@ int usage()
 	     "<reference>: a GM program number (gm.dls), a folder of <key>_<vel>.wav samples, or one .wav\n"
 	     "<list.txt>:  one 'reference<TAB>Preset Name' per line\n"
 	     "options: --evals N (1200)  --keys 48,60,72  --vel 100  --hold 1.5  --tail 0.5\n"
-	     "         --fix \"Title=v;Title=v\"  --skip \"substr;substr\"  --start preset.txt  --sigma S\n"
+	     "         --fix \"Title=v;#index=v\"  --skip \"substr;substr\"  --start preset.txt  --sigma S\n"
 	     "         --preroll S (0.15)  --name \"Preset Name\" (writes a .vstpreset)  --preset-dir D\n"
 	     "         --no-vstpreset  --delta W (spectral-change weight, 0.3)\n"
 	     "         --transpose N (play the target N semitones up; default: whole octaves detected)");
@@ -275,11 +275,13 @@ int main(int argc, char** argv)
 		n.key = atoi(pos[1].c_str()); n.velocity = atoi(pos[2].c_str());
 		n.holdSec = a.o.holdSec; n.tailSec = a.o.tailSec;
 		if (!a.o.start.empty() && !loadPresetTxt(vst, a.o.start)) { print("cannot read " + a.o.start); return 2; }
-		for (size_t i = 4; i < pos.size(); ++i) // optional "Parameter Title=0..1" overrides
+		for (size_t i = 4; i < pos.size(); ++i) // optional "Parameter Title=0..1" or "#index=0..1" overrides
 		{
 			const auto eq = pos[i].rfind('=');
-			for (size_t k = 0; eq != std::string::npos && k < vst.params().size(); ++k)
-				if (vst.params()[k].title == pos[i].substr(0, eq)) vst.values[k] = atof(pos[i].c_str() + eq + 1);
+			if (eq == std::string::npos) continue;
+			const std::string key = pos[i].substr(0, eq);
+			for (size_t k = 0; k < vst.params().size(); ++k)
+				if (key == vst.params()[k].title || key == "#" + std::to_string(k)) vst.values[k] = atof(pos[i].c_str() + eq + 1);
 		}
 		Audio out;
 		if (!vst.render(n, kSr, out)) { puts("render failed"); return 2; }
