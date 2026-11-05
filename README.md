@@ -143,6 +143,11 @@ detail counts for less than loud detail, and compared on: the fine time-frequenc
 tonal (long-window) spectrum, the per-band envelope, and the per-band *change* over 50 ms (which
 is what makes the fit care about how partials decay, not just how loud they are). The first 60 ms
 after note-on are weighted up. The candidate's gain is fitted out, so level is never the issue.
+The envelope is also compared as a handful of features read from the broadband level: attack, decay
+and release times, sustain level, and tremolo rate and depth (the strongest ripple between 0.5 and
+15 Hz on the held part). When the target has tremolo, the time-frequency surfaces are smoothed
+over one tremolo period before comparison, so the fit is judged on the rate and depth of the
+wobble rather than on landing in phase with it. `pmcli score` prints both sides' features.
 Similarity = 100·exp(−3·distance). `pmcal` (built alongside) runs the calibration tests the
 weights were chosen against: identity (same program, different velocity must rank first of 128),
 family retrieval, and monotonic degradation.

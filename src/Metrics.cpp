@@ -144,7 +144,7 @@ inline double loudness(double powerLin, double offDb, double thrDb)
 // Start the signal 2 ms before note-on. A producer that knows note-on says so (a.onset); only an
 // unlabelled WAV falls back to detecting it, which is a threshold and so a discontinuity: a slow
 // attack would otherwise be trimmed to where it becomes audible, hiding the attack itself.
-std::vector<float> trimOnset(const Audio& a)
+std::vector<float> trimOnset(const Audio& a, size_t* startOut = nullptr)
 {
 	const auto& x = a.s;
 	const size_t pre = size_t(0.002 * a.sampleRate);
@@ -159,7 +159,44 @@ std::vector<float> trimOnset(const Audio& a)
 		while (i < x.size() && std::fabs(x[i]) < pk * 1e-3f) ++i;
 	}
 	i = i > pre ? i - pre : 0;
-	return std::vector<float>(x.begin() + std::min(i, x.size()), x.end());
+	i = std::min(i, x.size());
+	if (startOut) *startOut = i;
+	return std::vector<float>(x.begin() + i, x.end());
+}
+
+// broadband level per frame, dB (arbitrary offset)
+std::vector<double> levelDb(const Scorer::Feat& f)
+{
+	std::vector<double> e(f.frames);
+	for (int fr = 0; fr < f.frames; ++fr)
+	{
+		double p = 0;
+		for (int b = 0; b < f.bands; ++b) p += f.power[size_t(fr) * f.bands + b];
+		e[fr] = 10.0 * std::log10(p + 1e-14);
+	}
+	return e;
+}
+
+EnvelopeFeatures featuresOf(const Scorer::Feat& f, int sr, long long noteOffSample)
+{
+	return extractFeatures(levelDb(f), double(f.hop) / sr, noteOffSample >= 0 ? noteOffSample / f.hop : -1);
+}
+
+// centred moving average along time, per band, for frames from `from` on (edges clamped)
+void smoothTime(std::vector<float>& l, int frames, int bands, int win, int from)
+{
+	if (win < 2 || frames < 2) return;
+	std::vector<float> out(l.begin(), l.end());
+	const int half = win / 2;
+	for (int b = 0; b < bands; ++b)
+		for (int fr = from; fr < frames; ++fr)
+		{
+			const int a = std::max(0, fr - half), e = std::min(frames, fr + half + 1);
+			double acc = 0;
+			for (int k = a; k < e; ++k) acc += l[size_t(k) * bands + b];
+			out[size_t(fr) * bands + b] = float(acc / (e - a));
+		}
+	l.swap(out);
 }
 } // namespace
 
@@ -168,8 +205,10 @@ double Score::similarity() const { return 100.0 * std::exp(-3.0 * total); }
 Scorer::Scorer(const Audio& ref, ScoreWeights w) : w_(w), sr_(ref.sampleRate)
 {
 	ref_.sampleRate = sr_;
-	ref_.s = trimOnset(ref);
+	size_t start = 0;
+	ref_.s = trimOnset(ref, &start);
 	len_ = ref_.s.size();
+	refOff_ = ref.noteOff >= 0 ? ref.noteOff - (long long)start : -1;
 	for (float v : ref_.s) refSumSq_ += double(v) * v;
 	for (int r = 0; r < 2; ++r)
 		refFeat_.push_back(analyse(ref_.s, kResN[r], kResHop[r], sr_, len_, w_.maskSpread));
@@ -183,13 +222,20 @@ Scorer::Scorer(const Audio& ref, ScoreWeights w) : w_(w), sr_(ref.sampleRate)
 		peak = std::max(peak, s);
 	}
 	offDb_ = w_.peakSpl - 10.0 * std::log10(peak);
+
+	refF_ = featuresOf(refFeat_[0], sr_, refOff_);
+	if (w_.tremoloBlind && refF_.tremoloHz > 0)
+		for (int r = 0; r < 2; ++r)
+			smoothFrames_[r] = int(std::lround(sr_ / (refF_.tremoloHz * kResHop[r])));
 }
 
 Score Scorer::compare(const Audio& candIn) const
 {
 	Score sc;
-	std::vector<float> cx = trimOnset(candIn);
+	size_t cstart = 0;
+	std::vector<float> cx = trimOnset(candIn, &cstart);
 	cx.resize(len_, 0.f); // a short render is padded with silence; a long one is cut
+	const long long candOff = candIn.noteOff >= 0 ? candIn.noteOff - (long long)cstart : -1;
 
 	double sumSq = 0;
 	for (float v : cx) sumSq += double(v) * v;
@@ -204,6 +250,8 @@ Score Scorer::compare(const Audio& candIn) const
 		const Feat cf = analyse(cx, kResN[r], kResHop[r], sr_, len_, w_.maskSpread);
 		const Feat& rf = refFeat_[r];
 		const BandMap bm = makeBands(kResN[r], sr_);
+		if (r == 0) sc.cand = featuresOf(cf, sr_, candOff);
+		const int smoothFrom = int(0.25 * sr_ / rf.hop); // the attack is compared as it is
 
 		// frame weights: an attack-emphasis distribution and a uniform one, each summing to 1
 		std::vector<double> aw(rf.frames);
@@ -231,19 +279,30 @@ Score Scorer::compare(const Audio& candIn) const
 			}
 			peakTot = std::max(peakTot, rtot[fr]);
 		}
+		if (smoothFrames_[r] > 1)
+		{
+			smoothTime(rl, rf.frames, kBands, smoothFrames_[r], smoothFrom);
+			for (int fr = 0; fr < rf.frames; ++fr)
+			{
+				rtot[fr] = 0;
+				for (int b = 0; b < kBands; ++b) rtot[fr] += rl[size_t(fr) * kBands + b];
+			}
+		}
 
 		const double eps = 0.05 * peakTot; // floor on the reference mass so silent regions can't blow up the ratio
 		const int lag = std::max(1, int(std::lround(w_.deltaLagSec * sr_ / rf.hop)));
 		std::vector<float> clAll(rl.size());
 		auto evalAt = [&](double g, double* attackOut, double* envOut, double* deltaOut) {
 			double dA = 0, dU = 0, mA = 0, mU = 0, eA = 0, eU = 0, dAtk = 0, mAtk = 1e-9;
+			for (size_t i = 0; i < clAll.size(); ++i)
+				clAll[i] = float(loudness(cf.power[i], offDb_ + g, bm.thr[i % kBands]));
+			if (smoothFrames_[r] > 1) smoothTime(clAll, rf.frames, kBands, smoothFrames_[r], smoothFrom);
 			for (int fr = 0; fr < rf.frames; ++fr)
 			{
 				double fd = 0, ctot = 0;
 				for (int b = 0; b < kBands; ++b)
 				{
-					const double cl = loudness(cf.power[size_t(fr) * kBands + b], offDb_ + g, bm.thr[b]);
-					clAll[size_t(fr) * kBands + b] = float(cl);
+					const double cl = clAll[size_t(fr) * kBands + b];
 					fd += std::fabs(rl[size_t(fr) * kBands + b] - cl);
 					ctot += cl;
 				}
@@ -313,6 +372,9 @@ Score Scorer::compare(const Audio& candIn) const
 	sc.attack = attackDist;
 	sc.gainDb = gainDb;
 	sc.level = std::fabs(gainDb) / 40.0;
-	sc.total = w_.wFine * sc.fine + w_.wTonal * sc.tonal + w_.wEnvelope * sc.envelope + w_.wDelta * sc.delta + w_.wLevel * sc.level;
+	sc.ref = refF_;
+	sc.features = featureDistance(refF_, sc.cand);
+	sc.total = w_.wFine * sc.fine + w_.wTonal * sc.tonal + w_.wEnvelope * sc.envelope + w_.wDelta * sc.delta + w_.wLevel * sc.level
+	         + w_.wFeatures * sc.features;
 	return sc;
 }

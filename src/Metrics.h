@@ -1,6 +1,7 @@
 #pragma once
 #include <complex>
 #include <vector>
+#include "Features.h"
 #include "Wav.h"
 
 void fft(std::vector<std::complex<float>>& a); // in place; the size is a power of two
@@ -19,6 +20,9 @@ void fft(std::vector<std::complex<float>>& a); // in place; the size is a power 
 //    ~100 ms, however long the note is. Each part is judged by error relative to its own loudness.
 //  - Spectral change: the loudness change of every band over ~50 ms is compared as well, so a
 //    partial that should die quickly is not satisfied by one that merely sits quietly.
+//  - Envelope and tremolo are also compared as features (attack, decay, sustain, release, tremolo
+//    rate and depth), and when the reference has tremolo both loudness surfaces are smoothed over
+//    one tremolo period beyond the attack, so the ripple is scored by rate and depth, not phase.
 //  - Overall gain is fitted out (a master-volume knob), the shape is what is scored.
 struct ScoreWeights
 {
@@ -30,6 +34,8 @@ struct ScoreWeights
 	double wDelta = 0.30;         // change of each band's loudness over deltaLagSec: how partials decay, not just where they sit
 	double deltaLagSec = 0.05;
 	double wLevel = 0.25;         // |gain offset| per 40 dB: a small cost for any level mismatch, a slope off the near-silent plateau
+	double wFeatures = 0.30;      // envelope and tremolo features (Features.h)
+	bool tremoloBlind = true;     // smooth the surfaces over the reference's tremolo period, after 0.25 s
 	double peakSpl = 75.0;        // reference's loudest frame is placed here (dB SPL)
 	double maskSpread = 0.0;      // width of the masking spread, 1 = Schroeder, 0 = off (calibration: no gain, see README)
 };
@@ -41,6 +47,8 @@ struct Score
 	double attack = 0;     // diagnostic: fine-resolution distance over the first 100 ms only
 	double gainDb = 0;     // level offset applied to the candidate to match
 	double level = 0;      // |gainDb| / 40: the level mismatch as a distance
+	double features = 0;   // envelope/tremolo feature distance
+	EnvelopeFeatures ref, cand;
 	double similarity() const; // 0..100
 };
 
@@ -63,5 +71,8 @@ private:
 	Audio ref_;
 	double offDb_ = 0; // reference calibration
 	double refSumSq_ = 0; // of the trimmed reference: seeds the gain fit-out
+	long long refOff_ = -1; // note-off sample in the trimmed reference, -1 unknown
+	EnvelopeFeatures refF_;
+	int smoothFrames_[2] = {}; // tremolo-period smoothing window per resolution, 0 = none
 	std::vector<Feat> refFeat_;
 };

@@ -244,6 +244,7 @@ bool Vst3Plugin::render(const NoteSpec& note, int sr, Audio& out)
 	out.sampleRate = sr;
 	out.s.assign(static_cast<size_t>(total), 0.f);
 	out.onset = 0; // the pre-roll is not recorded; note-on is the first sample
+	out.noteOff = holdN;
 
 	// Silent pre-roll: plugins that rebuild tables on a worker thread (FretPlucked bakes after a 60 ms
 	// debounce) only adopt the result at note-on, so give the new parameters real time to land first.

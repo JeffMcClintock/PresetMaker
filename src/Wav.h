@@ -10,7 +10,8 @@ struct Audio
 {
 	int sampleRate = 48000;
 	std::vector<float> s;
-	long long onset = -1; // sample of note-on when the producer knows it; -1 = detect from the signal
+	long long onset = -1;   // sample of note-on when the producer knows it; -1 = detect from the signal
+	long long noteOff = -1; // sample of note-off when the producer knows it; -1 = unknown
 };
 
 inline bool writeWav(const std::string& path, const Audio& a)

@@ -69,6 +69,7 @@ add_library(pm_core STATIC
     src/Reference.cpp
     src/Vst3Host.cpp
     src/Metrics.cpp
+    src/Features.cpp
     src/Pitch.cpp
     src/Fit.cpp
     src/PlatformWin.cpp

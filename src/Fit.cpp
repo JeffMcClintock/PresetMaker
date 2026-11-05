@@ -18,8 +18,8 @@ bool skipped(const VstParam& p, const FitOptions& o)
 
 std::string scoreLine(const Score& s)
 {
-	return std::format("similarity {:.1f}%  total {:.4f}  (fine {:.4f} tonal {:.4f} envelope {:.4f} delta {:.4f} level {:.4f} | attack-only {:.4f})  gain {:+.1f} dB",
-	                   s.similarity(), s.total, s.fine, s.tonal, s.envelope, s.delta, s.level, s.attack, s.gainDb);
+	return std::format("similarity {:.1f}%  total {:.4f}  (fine {:.4f} tonal {:.4f} envelope {:.4f} delta {:.4f} level {:.4f} features {:.4f} | attack-only {:.4f})  gain {:+.1f} dB",
+	                   s.similarity(), s.total, s.fine, s.tonal, s.envelope, s.delta, s.level, s.features, s.attack, s.gainDb);
 }
 } // namespace
 
