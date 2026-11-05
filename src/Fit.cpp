@@ -230,7 +230,7 @@ FitResult runFit(const FitOptions& o, ScoreWeights weights, std::function<bool(c
 	for (auto& n : notes) { Audio a; renderRef(n, transpose, a); writeWav(o.outDir + "/ref_" + std::to_string(n.key) + ".wav", a); }
 	if (!warm) log(std::format("after random seeding ({} evals): {:.4f}", used, bestF));
 
-	SepCma cma(bestX, sigma0);
+	SepCma cma(bestX, sigma0, o.seed);
 	while (used < o.budget && !cancelled)
 	{
 		used += cma.step(objective);
