@@ -20,6 +20,7 @@ int usage()
 	puts("pmcli gm-list\n"
 	     "pmcli gm-render <program> <key> <vel> <out.wav>\n"
 	     "pmcli vst-params <plugin.vst3>\n"
+	     "pmcli vst-repeat <plugin.vst3> <rounds> <out prefix> [--keys 48,60] [--start preset.txt] [\"Title=0..1\" ...]\n"
 	     "pmcli vst-render <plugin.vst3> <key> <vel> <out.wav> [--start preset.txt] [\"Title=0..1\" | \"#index=0..1\" ...]\n"
 	     "pmcli score <ref.wav> <cand.wav>\n"
 	     "pmcli pitch <note.wav>\n"
@@ -287,6 +288,34 @@ int main(int argc, char** argv)
 		Audio out;
 		if (!vst.render(n, kSr, out)) { puts("render failed"); return 2; }
 		writeWav(pos[3], out);
+		return 0;
+	}
+	if (cmd == "vst-repeat" && pos.size() >= 3) // one process, N rounds of --keys: does a render depend on the one before it?
+	{
+		if (!a.o.start.empty() && !loadPresetTxt(vst, a.o.start)) { print("cannot read " + a.o.start); return 2; }
+		for (size_t i = 3; i < pos.size(); ++i)
+		{
+			const auto eq = pos[i].rfind('=');
+			if (eq == std::string::npos) continue;
+			const std::string key = pos[i].substr(0, eq);
+			for (size_t k = 0; k < vst.params().size(); ++k)
+				if (key == vst.params()[k].title || key == "#" + std::to_string(k)) vst.values[k] = atof(pos[i].c_str() + eq + 1);
+		}
+		std::map<int, Audio> first;
+		const int rounds = atoi(pos[1].c_str());
+		for (int r = 0; r < rounds; ++r)
+			for (int key : a.o.keys)
+			{
+				NoteSpec n;
+				n.key = key; n.velocity = a.o.velocity; n.holdSec = a.o.holdSec; n.tailSec = a.o.tailSec;
+				Audio out;
+				if (!vst.render(n, kSr, out)) { puts("render failed"); return 2; }
+				writeWav(std::format("{}_r{}_k{}.wav", pos[2], r, key), out);
+				auto [it, isFirst] = first.try_emplace(key, out);
+				double peak = 0;
+				for (size_t i = 0; i < out.s.size(); ++i) peak = std::max(peak, double(std::fabs(out.s[i] - it->second.s[i])));
+				printf("round %d key %d: max difference from round 0 %.6f\n", r, key, peak);
+			}
 		return 0;
 	}
 	if (cmd == "export" && pos.size() >= 3)
